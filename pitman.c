@@ -6,18 +6,22 @@
 #include <GL/gl.h>
 #include <X11/X.h>
 #include <unistd.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <math.h>
 #include <complex.h>
 #include <limits.h>
 #include <time.h>
-#define THREADS 256
-long double xx=-2,yy=-2,wh=4/512.,nx,ny;
+#define THREADS 1
+
+long double xx=-2,yy=-2,wh=4/512.;
+int nx,ny;
 unsigned char manor[512][512];
-unsigned mxi=256;
+unsigned mxi=200;
 Display*dpy;
 Window win;
+
+int min(int x,int y){return y+(x-y&x-y>>sizeof(int)*8-1);}
+int max(int x,int y){return x-(x-y&x-y>>sizeof(int)*8-1);}
+int abs(int x){return (x^x>>sizeof(int)*8-1)-(x>>sizeof(int)*8-1);}
 
 void*drawman(void*xv){
 	unsigned th=*(unsigned*)xv;
@@ -36,6 +40,7 @@ void*drawman(void*xv){
 			next:;
 		}
 }
+
 int main(int argc,char**argv){
 	pthread_t a[THREADS];
 	dpy=XOpenDisplay(0);
@@ -67,31 +72,28 @@ int main(int argc,char**argv){
 			 case KeyPress:{
 				KeySym keysym;
 				char buffer;
-				if(XLookupString((XKeyEvent*)&event,&buffer,1,&keysym,NULL)==1&&keysym==(KeySym)XK_Escape)
+				if(XLookupString((XKeyEvent*)&event,&buffer,1,&keysym,NULL)==1&&keysym==XK_Escape)
 					return 0;
 				break;
 			}
 			case ButtonPress:
 				if(event.xbutton.button==Button1){
-					nx=xx+event.xbutton.x*wh;
-					ny=yy+event.xbutton.y*wh;
-				}else if(event.xbutton.button==Button4) mxi+=100;
-				else if(event.xbutton.button==Button5&&mxi>100) mxi-=100;
+					nx=event.xbutton.x;
+					ny=event.xbutton.y;
+				}else if(event.xbutton.button==Button4) mxi+=25;
+				else if(event.xbutton.button==Button5&&mxi>100) mxi-=25;
 				else goto rend;
 				break;
 			case ButtonRelease:
 				if(event.xbutton.button==Button1){
-					long double
-					tx=xx+event.xbutton.x*wh,
-					ty=yy+event.xbutton.y*wh;
-					if(tx==nx&&ty==ny){
+					if(event.xbutton.x==nx&&event.xbutton.y==ny){
 						xx+=(event.xbutton.x-512)*wh;
 						yy+=(event.xbutton.y-512)*wh;
 						wh*=2;
 					}else{
-						xx=fminl(tx,nx);
-						yy=fminl(ty,ny);
-						wh=fmaxl(fabsl(tx-nx),fabsl(ty-ny))/512.;
+						xx+=min(event.xbutton.x,nx)*wh;
+						yy+=min(event.xbutton.y,ny)*wh;
+						wh*=max(abs(event.xbutton.x-nx),abs(event.xbutton.y-ny))/512.;
 					}
 					rend:;
 					clock_t t=clock();
@@ -117,6 +119,5 @@ int main(int argc,char**argv){
 			}
 		}
 	}
-	ctx = glXGetCurrentContext();
-	glXDestroyContext(dpy, ctx);
+	glXDestroyContext(dpy,glXGetCurrentContext());
 }
