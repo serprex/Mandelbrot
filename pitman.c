@@ -10,7 +10,7 @@
 #include <complex.h>
 #include <limits.h>
 #include <time.h>
-#define THREADS 1
+#define THREADS 256
 
 long double xx=-2,yy=-2,wh=4/512.;
 int nx,ny;
