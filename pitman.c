@@ -19,22 +19,17 @@ unsigned mxi=200;
 Display*dpy;
 Window win;
 
-int min(int x,int y){return y+(x-y&x-y>>sizeof(int)*8-1);}
-int max(int x,int y){return x-(x-y&x-y>>sizeof(int)*8-1);}
-int abs(int x){return (~x>>sizeof(int)*8-1)-(x>>sizeof(int)*8-1);}
-
 void*drawman(void*xv){
 	unsigned i=*(unsigned*)xv;
 	for(int j=0;j<512;j++){
 		complex long double z=xx+wh*i+I*(yy+wh*j),c=z;
 		unsigned k=0;
-		do{
-			z=z*z+c;
-			if(__real(z)*__real(z)+__imag(z)*__imag(z)>=4){
+		do
+			if(cabsl(z=z*z+c)>=2){
 				manor[i][j]=~((k<<8)/mxi);
 				goto next;
 			}
-		}while(++k<mxi);
+		while(++k<mxi);
 		manor[i][j]=0;
 		next:;
 	}
@@ -43,7 +38,6 @@ void*drawman(void*xv){
 int main(int argc,char**argv){
 	pthread_t a[THREADS];
 	dpy=XOpenDisplay(0);
-	GLXFBConfig*fbc=glXChooseFBConfig(dpy,DefaultScreen(dpy),0,(int[]){0});
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
 	XSetWindowAttributes swa;
 	swa.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone);
@@ -90,9 +84,21 @@ int main(int argc,char**argv){
 						yy+=(event.xbutton.y-512)*wh;
 						wh*=2;
 					}else{
-						xx+=min(event.xbutton.x,nx)*wh;
-						yy+=min(event.xbutton.y,ny)*wh;
-						wh*=max(abs(event.xbutton.x-nx),abs(event.xbutton.y-ny))/512.;
+						if(event.xbutton.x<nx){
+							int t=event.xbutton.x;
+							event.xbutton.x=nx;
+							nx=t;
+						}
+						if(event.xbutton.y<ny){
+							int t=event.xbutton.y;
+							event.xbutton.y=ny;
+							ny=t;
+						}
+						xx+=nx*wh;
+						yy+=ny*wh;
+						nx=event.xbutton.x-nx;
+						ny=event.xbutton.y-ny;
+						wh*=(nx-(nx-ny&nx-ny>>sizeof(int)*8-1))/512.;
 					}
 					rend:;
 					clock_t t=clock();
@@ -117,7 +123,6 @@ int main(int argc,char**argv){
 								}
 							}
 					printf("%f\n",(clock()-t)/1000000.);
-					fflush(stdout);
 				}
 			}
 		}
