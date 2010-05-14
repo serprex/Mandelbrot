@@ -10,7 +10,7 @@
 #include <complex.h>
 #include <limits.h>
 #include <time.h>
-#define THREADS 256
+#define THREADS 8
 
 long double xx=-2,yy=-2,wh=4/512.;
 int nx,ny;
@@ -21,24 +21,23 @@ Window win;
 
 int min(int x,int y){return y+(x-y&x-y>>sizeof(int)*8-1);}
 int max(int x,int y){return x-(x-y&x-y>>sizeof(int)*8-1);}
-int abs(int x){return (x^x>>sizeof(int)*8-1)-(x>>sizeof(int)*8-1);}
+int abs(int x){return (~x>>sizeof(int)*8-1)-(x>>sizeof(int)*8-1);}
 
 void*drawman(void*xv){
-	unsigned th=*(unsigned*)xv;
-	for(int i=512/THREADS*th;i<512/THREADS*(th+1);i++)
-		for(int j=0;j<512;j++){
-			complex long double z=xx+wh*i+I*(yy+wh*j),c=z;
-			unsigned k=0;
-			do{
-				z=z*z+c;
-				if(__real(z)*__real(z)+__imag(z)*__imag(z)>=4){
-					manor[i][j]=~((k<<8)/mxi);
-					goto next;
-				}
-			}while(++k<mxi);
-			manor[i][j]=0;
-			next:;
-		}
+	unsigned i=*(unsigned*)xv;
+	for(int j=0;j<512;j++){
+		complex long double z=xx+wh*i+I*(yy+wh*j),c=z;
+		unsigned k=0;
+		do{
+			z=z*z+c;
+			if(__real(z)*__real(z)+__imag(z)*__imag(z)>=4){
+				manor[i][j]=~((k<<8)/mxi);
+				goto next;
+			}
+		}while(++k<mxi);
+		manor[i][j]=0;
+		next:;
+	}
 }
 
 int main(int argc,char**argv){
@@ -97,22 +96,26 @@ int main(int argc,char**argv){
 					}
 					rend:;
 					clock_t t=clock();
-					unsigned n[THREADS];
+					unsigned n[THREADS],mans=THREADS-1;
 					for(int i=0;i<THREADS;i++){
 						n[i]=i;
 						pthread_create(a+i,&pat,drawman,n+i);
 					}
-					for(int i=0;i<THREADS;i++){
-						pthread_join(a[i],0);
-						glBegin(GL_POINTS);
-						for(int k=512/THREADS*i;k<512/THREADS*(i+1);k++)
-							for(int j=0;j<512;j++){
-								glColor3f(manor[k][j]*manor[k][j]*manor[k][j]/16777216.,manor[k][j]*manor[k][j]/65536.,manor[k][j]/256.);
-								glVertex2i(k,j);
+					while(mans<511+THREADS)
+						for(int i=0;i<THREADS;i++)
+							if(!pthread_tryjoin_np(a[i],0)){
+								glBegin(GL_POINTS);
+								for(int j=0,k=n[i];j<512;j++){
+									glColor3f(manor[k][j]*manor[k][j]*manor[k][j]/16777216.,manor[k][j]*manor[k][j]/65536.,manor[k][j]/256.);
+									glVertex2i(k,j);
+								}
+								glEnd();
+								glFlush();
+								if(++mans<512){
+									n[i]=mans;
+									pthread_create(a+i,&pat,drawman,n+i);
+								}
 							}
-						glEnd();
-						glFlush();
-					}
 					printf("%f\n",(clock()-t)/1000000.);
 					fflush(stdout);
 				}
