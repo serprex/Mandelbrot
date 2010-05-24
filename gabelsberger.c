@@ -107,25 +107,35 @@ void muli(uint32_t*restrict x,uint64_t y){
 }
 void mul(uint32_t*restrict x,uint32_t*restrict y){
 	uint32_t z[pr*2];
-	for(int i=0;i<pr*2;i++) z[i]=0;
+	for(int i=1;i<pr*2;i++) z[i]=0;
 	x[0]^=y[0];
-	for(int i=1;i<pr;i++){
-		uint32_t c=0;
-		for(int j=1;j<pr;j++){
-			uint64_t t=x[j]*(uint64_t)y[i]+c;
-			z[i+j]+=t;
-			c=t>>32;
+	for(int i=0;i<pr;i++){
+		uint64_t c=0;
+		for(int j=0;j<pr;j++){
+			c+=z[i+j+1]+x[j+1]*(uint64_t)y[i+1];
+			z[i+j+1]=c;
+			c>>=32;
 		}
+		z[i+pr+1]=c;
 	}
-	for(int i=1;i<pr;i++) x[i]=z[pr+i-1];
+	for(int i=0;i<pr;i++) x[i+1]=z[pr-1+i];
 }
 void mulx(uint32_t*restrict x){
-	mul(x,x);
-}
-void shr9(uint32_t*restrict x){
-	for(uint32_t i=2;i<pr;i++)
-		x[i-1]=x[i-1]>>9|(x[i]&511)<<23;
-	x[pr-1]>>=9;
+	uint32_t z[pr*2];
+	for(int i=1;i<pr*2;i++) z[i]=0;
+	x[0]=0;
+	for(int i=0;i<pr-1;i++){
+		uint64_t f=x[i+1],c=z[i*2+1]+f*f;
+		z[i*2+1]=c;
+		c>>=32;
+		for(int j=i+1;j<pr-1;j++){
+			c+=z[i+j+1]+2*x[j+1]*f;
+			z[i+j+1]=c;
+			c>>=32;
+		}
+		z[i+pr-1+1]=c;
+	}
+	for(int i=0;i<pr;i++) x[i+1]=z[pr-1+i];
 }
 
 void*drawman(void*xv){
@@ -168,7 +178,7 @@ int main(int argc,char**argv){
 	for(int i=0;i<pr;i++) xx[i]=yy[i]=wh[i]=0;
 	xx[0]=yy[0]=1;
 	xx[pr-1]=yy[pr-1]=2;
-	wh[pr-2]=0x2000000;
+	wh[pr-2]=0x02000000;
 	dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
 	win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,512,512,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
@@ -190,10 +200,12 @@ int main(int argc,char**argv){
 		while(XPending(dpy)){
 			XNextEvent(dpy,&event);
 			switch(event.type){
-			 case KeyPress:{
+			case KeyPress:{
 				KeySym keysym;
-				if(XLookupString((XKeyEvent*)&event,(char[]){0},1,&keysym,NULL)==1&&keysym==XK_Escape)
-					goto EXIT;
+				if(XLookupString((XKeyEvent*)&event,(char[]){0},1,&keysym,NULL)==1&&keysym==XK_Escape){
+					glXDestroyContext(dpy,glXGetCurrentContext());
+					return 0;
+				}
 			}
 			break;case Expose:
 				glBegin(GL_POINTS);
@@ -209,30 +221,9 @@ int main(int argc,char**argv){
 					if((unsigned)event.xbutton.x>512||(unsigned)event.xbutton.y>512) break;
 					nx=event.xbutton.x;
 					ny=event.xbutton.y;
-				}else if(event.xbutton.button==Button4){
-					mxi+=100;
-					pr++;
-					xx=realloc(xx,4*pr);
-					yy=realloc(yy,4*pr);
-					wh=realloc(wh,4*pr);
-					for(int i=pr-1;i>1;i--){
-						xx[i]=xx[i-1];
-						yy[i]=yy[i-1];
-						wh[i]=wh[i-1];
-					}
-					xx[1]=yy[1]=wh[1]=0;
-				}else if(event.xbutton.button==Button5&&mxi>100){
-					mxi-=100;
-					pr--;
-					for(int i=1;i<pr;i++){
-						xx[i]=xx[i+1];
-						yy[i]=yy[i+1];
-						wh[i]=wh[i+1];
-					}
-					xx=realloc(xx,4*pr);
-					yy=realloc(yy,4*pr);
-					wh=realloc(wh,4*pr);
-				}else goto rend;
+				}else if(event.xbutton.button==Button4) mxi+=25;
+				else if(event.xbutton.button==Button5&&mxi>100) mxi-=25;
+				else goto rend;
 			break;case ButtonRelease:
 				if(event.xbutton.button==Button1){
 					if((unsigned)event.xbutton.x>512||(unsigned)event.xbutton.y>512) break;
@@ -266,7 +257,21 @@ int main(int argc,char**argv){
 						nx=event.xbutton.x-nx;
 						ny=event.xbutton.y-ny;
 						muli(wh,nx-(nx-ny&nx-ny>>sizeof(int)*8-1));
-						shr9(wh);
+						for(uint32_t i=2;i<pr;i++)
+							wh[i-1]=wh[i-1]>>9|(wh[i]&511)<<23;
+						wh[pr-1]>>=9;
+						if(wh[1]&0xFFF){
+							pr++;
+							xx=realloc(xx,4*pr);
+							yy=realloc(yy,4*pr);
+							wh=realloc(wh,4*pr);
+							for(int i=pr-1;i>1;i--){
+								xx[i]=xx[i-1];
+								yy[i]=yy[i-1];
+								wh[i]=wh[i-1];
+							}
+							xx[1]=yy[1]=wh[1]=0;
+						}
 					}
 					rend:;
 					prpr(xx);
@@ -297,5 +302,4 @@ int main(int argc,char**argv){
 			}
 		}
 	}
-	EXIT:glXDestroyContext(dpy,glXGetCurrentContext());
 }

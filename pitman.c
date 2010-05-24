@@ -52,8 +52,10 @@ int main(int argc,char**argv){
 			 case KeyPress:{
 				KeySym keysym;
 				char buffer;
-				if(XLookupString((XKeyEvent*)&event,&buffer,1,&keysym,NULL)==1&&keysym==XK_Escape)
-					goto EXIT;
+				if(XLookupString((XKeyEvent*)&event,&buffer,1,&keysym,NULL)==1&&keysym==XK_Escape){
+					glXDestroyContext(dpy,glXGetCurrentContext());
+					return 0;
+				}
 			}
 			break;case Expose:
 				glBegin(GL_POINTS);
@@ -119,5 +121,4 @@ int main(int argc,char**argv){
 			}
 		}
 	}
-	EXIT:glXDestroyContext(dpy,glXGetCurrentContext());
 }
