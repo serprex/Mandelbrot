@@ -1,7 +1,6 @@
 #define _GNU_SOURCE
 #include <pthread.h>
 #include <sched.h>
-#include <stdio.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <X11/X.h>
@@ -9,41 +8,29 @@
 #include <math.h>
 #include <complex.h>
 #include <limits.h>
-#include <time.h>
-#define THREADS 8
+#define THREADS 4
 
 long double xx=-2,yy=-2,wh=4/512.;
-int nx,ny;
 unsigned char manor[512][512];
 unsigned mxi=200;
 Display*dpy;
 Window win;
 
 void*drawman(void*xv){
-	unsigned i=*(unsigned*)xv;
 	for(int j=0;j<512;j++){
-		complex long double z=xx+wh*i+I*(yy+wh*j),c=z;
-		unsigned k=0;
-		do
-			if(cabsl(z=z*z+c)>=2){
-				manor[i][j]=~((k<<8)/mxi);
-				goto next;
-			}
-		while(++k<mxi);
-		manor[i][j]=0;
-		next:;
+		complex long double z=xx+wh*(xv-(void*)manor>>9)+I*(yy+wh*j),c=z;
+		unsigned k=mxi;
+		while(--k&&cabsl(z=z*z+c)<2);
+		((unsigned char*)xv)[j]=(k<<8)/mxi;
 	}
 }
 
 int main(int argc,char**argv){
+	int nx,ny;
 	pthread_t a[THREADS];
 	dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
-	XSetWindowAttributes swa;
-	swa.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone);
-	swa.border_pixel=0;
-	swa.event_mask=StructureNotifyMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask;
-	win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,512,512,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,&swa);
+	win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,512,512,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
 	GLXContext ctx=glXCreateContext(dpy,vi,0,GL_TRUE);
 	XEvent event;
@@ -66,18 +53,25 @@ int main(int argc,char**argv){
 				KeySym keysym;
 				char buffer;
 				if(XLookupString((XKeyEvent*)&event,&buffer,1,&keysym,NULL)==1&&keysym==XK_Escape)
-					return 0;
-				break;
+					goto EXIT;
 			}
-			case ButtonPress:
+			break;case Expose:
+				glBegin(GL_POINTS);
+				for(int i=0;i<512;i++)
+					for(int j=0;j<512;j++){
+						glColor3f(manor[i][j]*manor[i][j]*manor[i][j]/16777216.,manor[i][j]*manor[i][j]/65536.,manor[i][j]/256.);
+						glVertex2i(i,j);
+					}
+				glEnd();
+				glFlush();
+			break;case ButtonPress:
 				if(event.xbutton.button==Button1){
 					nx=event.xbutton.x;
 					ny=event.xbutton.y;
 				}else if(event.xbutton.button==Button4) mxi+=25;
 				else if(event.xbutton.button==Button5&&mxi>100) mxi-=25;
 				else goto rend;
-				break;
-			case ButtonRelease:
+			break;case ButtonRelease:
 				if(event.xbutton.button==Button1){
 					if(event.xbutton.x==nx&&event.xbutton.y==ny){
 						xx+=(event.xbutton.x-512)*wh;
@@ -101,11 +95,10 @@ int main(int argc,char**argv){
 						wh*=(nx-(nx-ny&nx-ny>>sizeof(int)*8-1))/512.;
 					}
 					rend:;
-					clock_t t=clock();
 					unsigned n[THREADS],mans=THREADS-1;
 					for(int i=0;i<THREADS;i++){
 						n[i]=i;
-						pthread_create(a+i,&pat,drawman,n+i);
+						pthread_create(a+i,&pat,drawman,manor+i);
 					}
 					while(mans<511+THREADS)
 						for(int i=0;i<THREADS;i++)
@@ -119,13 +112,12 @@ int main(int argc,char**argv){
 								glFlush();
 								if(++mans<512){
 									n[i]=mans;
-									pthread_create(a+i,&pat,drawman,n+i);
+									pthread_create(a+i,&pat,drawman,manor+mans);
 								}
 							}
-					printf("%f\n",(clock()-t)/1000000.);
 				}
 			}
 		}
 	}
-	glXDestroyContext(dpy,glXGetCurrentContext());
+	EXIT:glXDestroyContext(dpy,glXGetCurrentContext());
 }
