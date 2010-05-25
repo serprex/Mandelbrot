@@ -109,18 +109,20 @@ void mul(uint32_t*restrict x,uint32_t*restrict y){
 	uint32_t z[pr*2];
 	for(int i=1;i<pr*2;i++) z[i]=0;
 	x[0]^=y[0];
-	for(int i=0;i<pr;i++){
+	for(int i=1;i<pr;i++){
 		uint64_t c=0;
-		for(int j=0;j<pr;j++){
-			c+=z[i+j+1]+x[j+1]*(uint64_t)y[i+1];
-			z[i+j+1]=c;
+		for(int j=1;j<pr;j++){
+			c+=z[i+j]+x[j]*(uint64_t)y[i];
+			z[i+j]=c;
 			c>>=32;
 		}
-		z[i+pr+1]=c;
+		z[i+pr]=c;
 	}
-	for(int i=0;i<pr;i++) x[i+1]=z[pr-1+i];
+	for(int i=1;i<pr;i++) x[i]=z[i+pr-1];
 }
 void mulx(uint32_t*restrict x){
+	mul(x,x);
+	return;
 	uint32_t z[pr*2];
 	for(int i=1;i<pr*2;i++) z[i]=0;
 	x[0]=0;
@@ -135,7 +137,7 @@ void mulx(uint32_t*restrict x){
 		}
 		z[i+pr-1+1]=c;
 	}
-	for(int i=0;i<pr;i++) x[i+1]=z[pr-1+i];
+	for(int i=0;i<pr;i++) x[i+1]=z[i+pr-1];
 }
 
 void*drawman(void*xv){
@@ -260,7 +262,7 @@ int main(int argc,char**argv){
 						for(uint32_t i=2;i<pr;i++)
 							wh[i-1]=wh[i-1]>>9|(wh[i]&511)<<23;
 						wh[pr-1]>>=9;
-						if(wh[1]&0xFFF){
+						if(wh[1]&0x3FF){
 							pr++;
 							xx=realloc(xx,4*pr);
 							yy=realloc(yy,4*pr);
