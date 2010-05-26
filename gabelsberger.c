@@ -20,11 +20,9 @@ Display*dpy;
 Window win;
 
 void prpr(uint32_t*x){
-	putchar(x[0]?'-':'+');
-	printf("%x.",x[pr-1]);
-	for(int i=pr-2;i;i--) printf("%.8x ",x[i]);
-	putchar('\n');
-	fflush(stdout);
+	printf("%c%x.",x[0]?'-':'+',x[pr-1]);
+	for(int i=pr-2;i>1;i--) printf("%.8x ",x[i]);
+	printf("%.8x\n",x[1]);
 }
 
 void cpy(uint32_t*restrict x,uint32_t*restrict y){
@@ -40,52 +38,48 @@ void add(uint32_t*restrict x,uint32_t*restrict y){
 	if(x[0]==y[0]){
 		for(int i=1;i<pr;i++){
 			uint32_t t=x[i];
-			x[i]+=y[i]+c;
-			c=t+y[i]+c<t;
+			c=(x[i]+=y[i]+c)<t;
 		}
 	}else{
 		int a=cmp(x,y);
-		if(!a) for(int i=0;i<pr;i++) x[i]=0;
-		else if(a>0){
+		if(a>0){
 			for(int i=1;i<pr;i++){
 				uint32_t t=x[i];
 				x[i]-=y[i]+c;
 				c=t<y[i]+c;
 			}
-		}else{
+		}else if(a<0){
 			x[0]^=1;
 			for(int i=1;i<pr;i++){
-				uint32_t t=x[i];
-				x[i]=y[i]-x[i]-c;
-				c=y[i]<t+c;
+				uint32_t t=x[i]+=c;
+				x[i]=y[i]-x[i];
+				c=y[i]<t;
 			}
-		}
+		}else for(int i=0;i<pr;i++) x[i]=0;
 	}
 }
 void sub(uint32_t*restrict x,uint32_t*restrict y){
 	uint32_t c=0;
 	if(x[0]==y[0]){
 		int a=cmp(x,y);
-		if(!a) for(int i=0;i<pr;i++) x[i]=0;
-		else if(a>0){
+		if(a>0){
 			for(int i=1;i<pr;i++){
 				uint32_t t=x[i];
 				x[i]-=y[i]+c;
 				c=t<y[i]+c;
 			}
-		}else{
+		}else if(a<0){
 			x[0]^=1;
 			for(int i=1;i<pr;i++){
-				uint32_t t=x[i];
-				x[i]=y[i]-x[i]-c;
-				c=y[i]<t+c;
+				uint32_t t=x[i]+=c;
+				x[i]=y[i]-x[i];
+				c=y[i]<t;
 			}
-		}
+		}else for(int i=0;i<pr;i++) x[i]=0;
 	}else{
 		for(int i=1;i<pr;i++){
 			uint32_t t=x[i];
-			x[i]+=y[i]+c;
-			c=t+y[i]+c<t;
+			c=(x[i]+=y[i]+c)<t;
 		}
 	}
 }
@@ -93,16 +87,15 @@ void mul2(uint32_t*restrict x){
 	uint32_t c=0;
 	for(int i=1;i<pr;i++){
 		uint32_t t=x[i];
-		x[i]=x[i]<<1|c;
+		x[i]=t<<1|c;
 		c=t>>31;
 	}
 }
 void muli(uint32_t*restrict x,uint64_t y){
-	uint32_t c=0;
+	uint64_t c=0;
 	for(int i=1;i<pr;i++){
-		uint64_t t=x[i]*y+c;
-		x[i]=t;
-		c=t>>32;
+		x[i]=c+=x[i]*y;
+		c>>=32;
 	}
 }
 void mul(uint32_t*restrict x,uint32_t*restrict y){
@@ -112,8 +105,7 @@ void mul(uint32_t*restrict x,uint32_t*restrict y){
 	for(int i=1;i<pr;i++){
 		uint64_t c=0;
 		for(int j=1;j<pr;j++){
-			c+=z[i+j]+x[j]*(uint64_t)y[i];
-			z[i+j]=c;
+			z[i+j]=c+=z[i+j]+x[j]*(uint64_t)y[i];
 			c>>=32;
 		}
 		z[i+pr]=c;
@@ -121,8 +113,6 @@ void mul(uint32_t*restrict x,uint32_t*restrict y){
 	for(int i=1;i<pr;i++) x[i]=z[i+pr-1];
 }
 void mulx(uint32_t*restrict x){
-	mul(x,x);
-	return;
 	uint32_t z[pr*2];
 	for(int i=1;i<pr*2;i++) z[i]=0;
 	x[0]=0;
@@ -131,13 +121,12 @@ void mulx(uint32_t*restrict x){
 		z[i*2+1]=c;
 		c>>=32;
 		for(int j=i+1;j<pr-1;j++){
-			c+=z[i+j+1]+2*x[j+1]*f;
-			z[i+j+1]=c;
+			z[i+j+1]=c+=z[i+j+1]+2*x[j+1]*f;
 			c>>=32;
 		}
-		z[i+pr-1+1]=c;
+		z[i+pr]=c;
 	}
-	for(int i=0;i<pr;i++) x[i+1]=z[i+pr-1];
+	for(int i=1;i<pr;i++) x[i]=z[i+pr-2];
 }
 
 void*drawman(void*xv){
@@ -174,9 +163,9 @@ void*drawman(void*xv){
 int main(int argc,char**argv){
 	int nx,ny;
 	pthread_t a[THREADS];
-	xx=malloc(4*pr);
-	yy=malloc(4*pr);
-	wh=malloc(4*pr);
+	xx=malloc(12);
+	yy=malloc(12);
+	wh=malloc(12);
 	for(int i=0;i<pr;i++) xx[i]=yy[i]=wh[i]=0;
 	xx[0]=yy[0]=1;
 	xx[pr-1]=yy[pr-1]=2;
@@ -262,7 +251,7 @@ int main(int argc,char**argv){
 						for(uint32_t i=2;i<pr;i++)
 							wh[i-1]=wh[i-1]>>9|(wh[i]&511)<<23;
 						wh[pr-1]>>=9;
-						if(wh[1]&0x3FF){
+						if(!wh[2]&&wh[1]){
 							pr++;
 							xx=realloc(xx,4*pr);
 							yy=realloc(yy,4*pr);

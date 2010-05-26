@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <pthread.h>
 #include <sched.h>
+#include <stdio.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <X11/X.h>
@@ -96,7 +97,8 @@ int main(int argc,char**argv){
 						ny=event.xbutton.y-ny;
 						wh*=(nx-(nx-ny&nx-ny>>sizeof(int)*8-1))/512.;
 					}
-					rend:;
+					rend:
+					printf("%Lf\n%Lf\n%Lf\n\n",xx,yy,wh);
 					unsigned n[THREADS],mans=THREADS-1;
 					for(int i=0;i<THREADS;i++){
 						n[i]=i;
