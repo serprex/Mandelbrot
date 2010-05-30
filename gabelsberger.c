@@ -155,7 +155,7 @@ void*drawman(void*xv){
 			cpy(ii,zi);
 			mulx(ii);
 			add(zz,ii);
-		}while(--k&&zz[pr-1]<16);
+		}while(--k&&zz[pr-1]<4);
 		((unsigned char*)xv)[j]=(k<<8)/mxi;
 	}
 }
