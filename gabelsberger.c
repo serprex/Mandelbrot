@@ -28,68 +28,64 @@ void prpr(uint32_t*x){
 void cpy(uint32_t*restrict x,uint32_t*restrict y){
 	for(int i=0;i<pr;i++) x[i]=y[i];
 }
-int cmp(uint32_t*restrict x,uint32_t*restrict y){
-	for(int i=pr-1;i;i--)
-		if(x[i]!=y[i]) return x[i]>y[i]?1:-1;
-	return 0;
-}
 void add(uint32_t*restrict x,uint32_t*restrict y){
 	uint32_t c=0;
-	if(x[0]==y[0]){
+	if(x[0]==y[0])
 		for(int i=1;i<pr;i++){
 			uint32_t t=x[i];
 			c=(x[i]+=y[i]+c)<t;
 		}
-	}else{
-		int a=cmp(x,y);
-		if(a>0){
-			for(int i=1;i<pr;i++){
-				uint32_t t=x[i];
-				x[i]-=y[i]+c;
-				c=t<y[i]+c;
-			}
-		}else if(a<0){
-			x[0]^=1;
-			for(int i=1;i<pr;i++){
-				uint32_t t=x[i]+=c;
-				x[i]=y[i]-x[i];
-				c=y[i]<t;
-			}
-		}else for(int i=0;i<pr;i++) x[i]=0;
+	else{
+		for(int i=pr-1;i;i--){
+			if(x[i]>y[i])
+				for(int i=1;i<pr;i++){
+					uint32_t t=x[i];
+					x[i]-=y[i]+c;
+					c=t<y[i]+c;
+				}
+			else if(x[i]<y[i]){
+				x[0]^=1;
+				for(int i=1;i<pr;i++){
+					uint32_t t=x[i]+c;
+					x[i]=y[i]-t;
+					c=y[i]<t;
+				}
+			}else continue;
+			return;
+		}
+		for(int i=1;i<pr;i++) x[i]=0;
 	}
 }
 void sub(uint32_t*restrict x,uint32_t*restrict y){
 	uint32_t c=0;
 	if(x[0]==y[0]){
-		int a=cmp(x,y);
-		if(a>0){
-			for(int i=1;i<pr;i++){
-				uint32_t t=x[i];
-				x[i]-=y[i]+c;
-				c=t<y[i]+c;
-			}
-		}else if(a<0){
-			x[0]^=1;
-			for(int i=1;i<pr;i++){
-				uint32_t t=x[i]+=c;
-				x[i]=y[i]-x[i];
-				c=y[i]<t;
-			}
-		}else for(int i=0;i<pr;i++) x[i]=0;
-	}else{
+		for(int i=pr-1;i;i--){
+			if(x[i]>y[i])
+				for(int i=1;i<pr;i++){
+					uint32_t t=x[i];
+					x[i]-=y[i]+c;
+					c=t<y[i]+c;
+				}
+			else if(x[i]<y[i]){
+				x[0]^=1;
+				for(int i=1;i<pr;i++){
+					uint32_t t=x[i]+c;
+					x[i]=y[i]-t;
+					c=y[i]<t;
+				}
+			}else continue;
+			return;
+		}
+		for(int i=1;i<pr;i++) x[i]=0;
+	}else
 		for(int i=1;i<pr;i++){
 			uint32_t t=x[i];
 			c=(x[i]+=y[i]+c)<t;
 		}
-	}
 }
 void mul2(uint32_t*restrict x){
-	uint32_t c=0;
-	for(int i=1;i<pr;i++){
-		uint32_t t=x[i];
-		x[i]=t<<1|c;
-		c=t>>31;
-	}
+	int i=pr-1;
+	do x[i]=x[i]<<1|x[i-1]>>31; while(--i);
 }
 void muli(uint32_t*restrict x,uint64_t y){
 	uint64_t c=0;
@@ -99,36 +95,38 @@ void muli(uint32_t*restrict x,uint64_t y){
 	}
 }
 void mul(uint32_t*restrict x,uint32_t*restrict y){
-	uint32_t z[pr*2];
-	for(int i=1;i<pr*2;i++) z[i]=0;
+	uint32_t z[pr];
 	x[0]^=y[0];
+	for(int i=0;i<pr;i++) z[i]=0;
 	for(int i=1;i<pr;i++){
 		uint64_t c=0;
-		for(int j=1;j<pr;j++){
-			z[i+j]=c+=z[i+j]+x[j]*(uint64_t)y[i];
+		int j=1;
+		for(;i+j<pr;j++)
+			c=c+x[i]*(uint64_t)y[j]>>32;
+		for(;j<pr;j++){
+			z[i+j-pr]=c+=z[i+j-pr]+x[i]*(uint64_t)y[j];
 			c>>=32;
 		}
-		z[i+pr]=c;
+		z[i]=c;
 	}
-	for(int i=1;i<pr;i++) x[i]=z[i+pr-1];
+	for(int i=1;i<pr;i++) x[i]=z[i-1];
 }
 void mulx(uint32_t*restrict x){
 	uint32_t z[pr*2];
 	for(int i=1;i<pr*2;i++) z[i]=0;
 	x[0]=0;
-	for(int i=0;i<pr-1;i++){
-		uint64_t f=x[i+1],c=z[i*2+1]+f*f;
-		z[i*2+1]=c;
+	for(int i=1;i<pr;i++){
+		uint64_t f=x[i],c=z[i*2-1]+f*f;
+		z[i*2-1]=c;
 		c>>=32;
-		for(int j=i+1;j<pr-1;j++){
-			z[i+j+1]=c+=z[i+j+1]+2*x[j+1]*f;
+		for(int j=i;j<pr-1;j++){
+			z[i+j]=c+=z[i+j]+2*x[j+1]*f;
 			c>>=32;
 		}
-		z[i+pr]=c;
+		z[i+pr-1]=c;
 	}
 	for(int i=1;i<pr;i++) x[i]=z[i+pr-2];
 }
-
 void*drawman(void*xv){
 	uint32_t zr[pr],zi[pr],zz[pr],ii[pr],cr[pr],ci[pr];
 	cpy(cr,wh);
@@ -277,17 +275,18 @@ int main(int argc,char**argv){
 					while(mans<511+THREADS)
 						for(int i=0;i<THREADS;i++)
 							if(!pthread_tryjoin_np(a[i],0)){
-								glBegin(GL_POINTS);
-								for(int j=0,k=n[i];j<512;j++){
-									glColor3f(manor[k][j]*manor[k][j]*manor[k][j]/16777216.,manor[k][j]*manor[k][j]/65536.,manor[k][j]/256.);
-									glVertex2i(k,j);
-								}
-								glEnd();
-								glFlush();
+								int k=n[i];
 								if(++mans<512){
 									n[i]=mans;
 									pthread_create(a+i,&pat,drawman,manor+mans);
 								}
+								glBegin(GL_POINTS);
+								for(int j=0;j<512;j++){
+									glColor3ub(manor[k][j]*manor[k][j]*manor[k][j]>>16,manor[k][j]*manor[k][j]>>8,manor[k][j]);
+									glVertex2i(k,j);
+								}
+								glEnd();
+								glFlush();
 							}
 				}
 			}
