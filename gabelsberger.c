@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
-#include <X11/X.h>
 #include <unistd.h>
 #include <math.h>
 #include <complex.h>
@@ -15,9 +14,7 @@
 
 uint32_t*xx,*yy,*wh;
 unsigned char manor[512][512];
-unsigned mxi=100,pr=3;
-Display*dpy;
-Window win;
+unsigned mxi=150,pr=5;
 
 void prpr(uint32_t*x){
 	printf("%c%x.",x[0]?'-':'+',x[pr-1]);
@@ -25,9 +22,6 @@ void prpr(uint32_t*x){
 	printf("%.8x\n",x[1]);
 }
 
-void cpy(uint32_t*restrict x,uint32_t*restrict y){
-	for(int i=0;i<pr;i++) x[i]=y[i];
-}
 void add(uint32_t*restrict x,uint32_t*restrict y){
 	uint32_t c=0;
 	if(x[0]==y[0])
@@ -83,10 +77,6 @@ void sub(uint32_t*restrict x,uint32_t*restrict y){
 			c=(x[i]+=y[i]+c)<t;
 		}
 }
-void mul2(uint32_t*restrict x){
-	int i=pr-1;
-	do x[i]=x[i]<<1|x[i-1]>>31; while(--i);
-}
 void muli(uint32_t*restrict x,uint64_t y){
 	uint64_t c=0;
 	for(int i=1;i<pr;i++){
@@ -129,29 +119,44 @@ void mulx(uint32_t*restrict x){
 }
 void*drawman(void*xv){
 	uint32_t zr[pr],zi[pr],zz[pr],ii[pr],cr[pr],ci[pr];
-	cpy(cr,wh);
+	for(int i=0;i<pr;i++) cr[i]=wh[i];
 	muli(cr,xv-(void*)manor>>9);
 	add(cr,xx);
-	cpy(ci,yy);
+	for(int i=0;i<pr;i++) ci[i]=yy[i];
 	for(int j=0;j<512;j++){
-		cpy(zr,cr);
+		for(int i=0;i<pr;i++) zr[i]=cr[i];
 		add(ci,wh);
-		cpy(zi,ci);
+		for(int i=0;i<pr;i++) zi[i]=ci[i];
 		unsigned k=mxi;
 		do{
-			cpy(zz,zr);
-			cpy(ii,zi);
-			mulx(ii);
+			for(int i=0;i<pr;i++) zz[i]=zr[i];
 			mulx(zr);
+			for(int i=0;i<pr;i++) ii[i]=zi[i];
+			mulx(ii);
 			sub(zr,ii);
 			add(zr,cr);
 			mul(zi,zz);
-			mul2(zi);
+			int i2=pr-1;
+			do zi[i2]=zi[i2]<<1|zi[i2-1]>>31; while(--i2);
 			add(zi,ci);
-			cpy(zz,zr);
+			for(int i=0;i<pr;i++) zz[i]=zr[i];
 			mulx(zz);
-			cpy(ii,zi);
+			for(int i=0;i<pr;i++) ii[i]=zi[i];
 			mulx(ii);
+			/*uint32_t zx[pr*2];
+			for(int i=1;i<pr*2;i++) z[i]=0;
+			for(int i=1;i<pr;i++){
+				uint64_t f=zi[i],c=zx[i*2-1]+f*f;
+				zx[i*2-1]=c;
+				c>>=32;
+				for(int j=i;j<pr-1;j++){
+					zx[i+j]=c+=zx[i+j]+2*zi[j+1]*f;
+					c>>=32;
+				}
+				zx[i+pr-1]=c;
+			}
+			ii[0]=0;
+			for(int i=1;i<pr;i++) ii[i]=zx[i+pr-2];*/
 			add(zz,ii);
 		}while(--k&&zz[pr-1]<4);
 		((unsigned char*)xv)[j]=(k<<8)/mxi;
@@ -161,16 +166,16 @@ void*drawman(void*xv){
 int main(int argc,char**argv){
 	int nx,ny;
 	pthread_t a[THREADS];
-	xx=malloc(12);
-	yy=malloc(12);
-	wh=malloc(12);
+	xx=malloc(4*pr);
+	yy=malloc(4*pr);
+	wh=malloc(4*pr);
 	for(int i=0;i<pr;i++) xx[i]=yy[i]=wh[i]=0;
 	xx[0]=yy[0]=1;
 	xx[pr-1]=yy[pr-1]=2;
 	wh[pr-2]=0x02000000;
-	dpy=XOpenDisplay(0);
+	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
-	win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,512,512,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
+	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,512,512,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
 	GLXContext ctx=glXCreateContext(dpy,vi,0,GL_TRUE);
 	XEvent event;
@@ -178,7 +183,7 @@ int main(int argc,char**argv){
 	glOrtho(0,512,512,0,1,-1);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
-	pthread_attr_setstacksize(&pat,PTHREAD_STACK_MIN+pr*16);
+	pthread_attr_setstacksize(&pat,PTHREAD_STACK_MIN);
 	pthread_attr_setguardsize(&pat,0);
 	pthread_attr_setinheritsched(&pat,PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&pat,SCHED_RR);
@@ -218,13 +223,14 @@ int main(int argc,char**argv){
 					if((unsigned)event.xbutton.x>512||(unsigned)event.xbutton.y>512) break;
 					if(event.xbutton.x==nx&&event.xbutton.y==ny){
 						uint32_t bx[pr];
-						cpy(bx,wh);
+						for(int i=0;i<pr;i++) bx[i]=wh[i];
 						muli(bx,512-event.xbutton.x);
 						sub(xx,bx);
-						cpy(bx,wh);
+						for(int i=0;i<pr;i++) bx[i]=wh[i];
 						muli(bx,512-event.xbutton.y);
 						sub(yy,bx);
-						mul2(wh);
+						int i2=pr-1;
+						do wh[i2]=wh[i2]<<1|wh[i2-1]>>31; while(--i2);
 					}else{
 						uint32_t bx[pr];
 						if(event.xbutton.x<nx){
@@ -237,17 +243,17 @@ int main(int argc,char**argv){
 							event.xbutton.y=ny;
 							ny=t;
 						}
-						cpy(bx,wh);
+						for(int i=0;i<pr;i++) bx[i]=wh[i];
 						muli(bx,nx);
 						add(xx,bx);
-						cpy(bx,wh);
+						for(int i=0;i<pr;i++) bx[i]=wh[i];
 						muli(bx,ny);
 						add(yy,bx);
 						nx=event.xbutton.x-nx;
 						ny=event.xbutton.y-ny;
 						muli(wh,nx-(nx-ny&nx-ny>>sizeof(int)*8-1));
-						for(uint32_t i=2;i<pr;i++)
-							wh[i-1]=wh[i-1]>>9|(wh[i]&511)<<23;
+						for(uint32_t i=1;i<pr-1;i++)
+							wh[i]=wh[i]>>9|(wh[i+1]&511)<<23;
 						wh[pr-1]>>=9;
 						if(!wh[2]&&wh[1]){
 							pr++;

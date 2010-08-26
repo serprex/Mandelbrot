@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
-#include <X11/X.h>
 #include <unistd.h>
 #include <math.h>
 #include <complex.h>
