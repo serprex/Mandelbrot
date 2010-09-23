@@ -42,8 +42,8 @@ int main(int argc,char**argv){
 	pthread_attr_setguardsize(&pat,0);
 	pthread_attr_setinheritsched(&pat,PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&pat,SCHED_RR);
-    pthread_attr_setschedparam(&pat,(struct sched_param[]){{.sched_priority=sched_get_priority_max(SCHED_RR)}});
-    pthread_setschedparam(pthread_self(),SCHED_RR,(struct sched_param[]){{.sched_priority=sched_get_priority_min(SCHED_RR)}});
+	pthread_attr_setschedparam(&pat,(struct sched_param[]){{.sched_priority=sched_get_priority_max(SCHED_RR)}});
+	pthread_setschedparam(pthread_self(),SCHED_RR,(struct sched_param[]){{.sched_priority=sched_get_priority_min(SCHED_RR)}});
 	goto rend;
 	for(;;){
 		while(XPending(dpy)){

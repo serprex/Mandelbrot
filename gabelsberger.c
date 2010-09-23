@@ -1,186 +1,98 @@
 #define _GNU_SOURCE
 #include <pthread.h>
+#include <gmp.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <unistd.h>
-#include <math.h>
-#include <complex.h>
 #include <limits.h>
-#include <stdint.h>
 #define THREADS 4
-
-uint32_t*xx,*yy,*wh;
+mp_limb_t*xx,*yy,*wh,*z4;
+_Bool xs=1,ys=1;
 unsigned char manor[512][512];
-unsigned mxi=150,pr=5;
-
-void prpr(uint32_t*x){
-	printf("%c%x.",x[0]?'-':'+',x[pr-1]);
-	for(int i=pr-2;i>1;i--) printf("%.8x ",x[i]);
-	printf("%.8x\n",x[1]);
+unsigned mxi=300,q=59;
+mp_size_t pr;
+mp_limb_t mymp_lsh(mp_limb_t*r,mp_limb_t*s,mp_size_t p,unsigned n){
+	while(n>=mp_bits_per_limb){
+		mpn_lshift(r,s,p,mp_bits_per_limb-1);
+		n-=mp_bits_per_limb-1;
+	}
+	return mpn_lshift(r,s,p,n);
 }
-
-void add(uint32_t*restrict x,uint32_t*restrict y){
-	uint32_t c=0;
-	if(x[0]==y[0])
-		for(int i=1;i<pr;i++){
-			uint32_t t=x[i];
-			c=(x[i]+=y[i]+c)<t;
-		}
+mp_limb_t mymp_rsh(mp_limb_t*r,mp_limb_t*s,mp_size_t p,unsigned n){
+	while(n>=mp_bits_per_limb){
+		mpn_rshift(r,s,p,mp_bits_per_limb-1);
+		n-=mp_bits_per_limb-1;
+	}
+	return mpn_rshift(r,s,p,n);
+}
+void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*rs){
+	*rs=as;
+	if(as==bs) mpn_add_n(r,a,b,n);
+	else if(mpn_cmp(a,b,n)>=0) mpn_sub_n(r,a,b,n);
 	else{
-		for(int i=pr-1;i;i--){
-			if(x[i]>y[i])
-				for(int i=1;i<pr;i++){
-					uint32_t t=x[i];
-					x[i]-=y[i]+c;
-					c=t<y[i]+c;
-				}
-			else if(x[i]<y[i]){
-				x[0]^=1;
-				for(int i=1;i<pr;i++){
-					uint32_t t=x[i]+c;
-					x[i]=y[i]-t;
-					c=y[i]<t;
-				}
-			}else continue;
-			return;
-		}
-		for(int i=1;i<pr;i++) x[i]=0;
+		*rs=!as;
+		mpn_sub_n(r,b,a,n);
 	}
-}
-void sub(uint32_t*restrict x,uint32_t*restrict y){
-	uint32_t c=0;
-	if(x[0]==y[0]){
-		for(int i=pr-1;i;i--){
-			if(x[i]>y[i])
-				for(int i=1;i<pr;i++){
-					uint32_t t=x[i];
-					x[i]-=y[i]+c;
-					c=t<y[i]+c;
-				}
-			else if(x[i]<y[i]){
-				x[0]^=1;
-				for(int i=1;i<pr;i++){
-					uint32_t t=x[i]+c;
-					x[i]=y[i]-t;
-					c=y[i]<t;
-				}
-			}else continue;
-			return;
-		}
-		for(int i=1;i<pr;i++) x[i]=0;
-	}else
-		for(int i=1;i<pr;i++){
-			uint32_t t=x[i];
-			c=(x[i]+=y[i]+c)<t;
-		}
-}
-void muli(uint32_t*restrict x,uint64_t y){
-	uint64_t c=0;
-	for(int i=1;i<pr;i++){
-		x[i]=c+=x[i]*y;
-		c>>=32;
-	}
-}
-void mul(uint32_t*restrict x,uint32_t*restrict y){
-	uint32_t z[pr];
-	x[0]^=y[0];
-	for(int i=0;i<pr;i++) z[i]=0;
-	for(int i=1;i<pr;i++){
-		uint64_t c=0;
-		int j=1;
-		for(;i+j<pr;j++)
-			c=c+x[i]*(uint64_t)y[j]>>32;
-		for(;j<pr;j++){
-			z[i+j-pr]=c+=z[i+j-pr]+x[i]*(uint64_t)y[j];
-			c>>=32;
-		}
-		z[i]=c;
-	}
-	for(int i=1;i<pr;i++) x[i]=z[i-1];
-}
-void mulx(uint32_t*restrict x){
-	uint32_t z[pr*2];
-	for(int i=1;i<pr*2;i++) z[i]=0;
-	x[0]=0;
-	for(int i=1;i<pr;i++){
-		uint64_t f=x[i],c=z[i*2-1]+f*f;
-		z[i*2-1]=c;
-		c>>=32;
-		for(int j=i;j<pr-1;j++){
-			z[i+j]=c+=z[i+j]+2*x[j+1]*f;
-			c>>=32;
-		}
-		z[i+pr-1]=c;
-	}
-	for(int i=1;i<pr;i++) x[i]=z[i+pr-2];
 }
 void*drawman(void*xv){
-	uint32_t zr[pr],zi[pr],zz[pr],ii[pr],cr[pr],ci[pr];
-	for(int i=0;i<pr;i++) cr[i]=wh[i];
-	muli(cr,xv-(void*)manor>>9);
-	add(cr,xx);
-	for(int i=0;i<pr;i++) ci[i]=yy[i];
-	for(int j=0;j<512;j++){
-		for(int i=0;i<pr;i++) zr[i]=cr[i];
-		add(ci,wh);
-		for(int i=0;i<pr;i++) zi[i]=ci[i];
+	mp_limb_t zr[pr*2],zi[pr*2],ii[pr*2],i2[pr*2],cr[pr*2],ci[pr*2];
+	_Bool zrs,zis,crs,cis,iis;
+	mpn_mul_1(cr,wh,pr,xv-(void*)manor>>9);
+	mymp_add(cr,cr,xx,pr,0,xs,&crs);
+	mpn_copyi(ci,yy,pr);
+	cis=ys;
+	for(mp_limb_t j=0;j<512;j++){
+		zrs=crs;
+		mpn_copyi(zr,cr,pr);
+		mymp_add(ci,ci,wh,pr,cis,0,&cis);
+		zis=cis;
+		mpn_copyi(zi,ci,pr);
 		unsigned k=mxi;
 		do{
-			for(int i=0;i<pr;i++) zz[i]=zr[i];
-			mulx(zr);
-			for(int i=0;i<pr;i++) ii[i]=zi[i];
-			mulx(ii);
-			sub(zr,ii);
-			add(zr,cr);
-			mul(zi,zz);
-			int i2=pr-1;
-			do zi[i2]=zi[i2]<<1|zi[i2-1]>>31; while(--i2);
-			add(zi,ci);
-			for(int i=0;i<pr;i++) zz[i]=zr[i];
-			mulx(zz);
-			for(int i=0;i<pr;i++) ii[i]=zi[i];
-			mulx(ii);
-			/*uint32_t zx[pr*2];
-			for(int i=1;i<pr*2;i++) z[i]=0;
-			for(int i=1;i<pr;i++){
-				uint64_t f=zi[i],c=zx[i*2-1]+f*f;
-				zx[i*2-1]=c;
-				c>>=32;
-				for(int j=i;j<pr-1;j++){
-					zx[i+j]=c+=zx[i+j]+2*zi[j+1]*f;
-					c>>=32;
-				}
-				zx[i+pr-1]=c;
-			}
-			ii[0]=0;
-			for(int i=1;i<pr;i++) ii[i]=zx[i+pr-2];*/
-			add(zz,ii);
-		}while(--k&&zz[pr-1]<4);
+			iis=zrs^zis;
+			mpn_mul_n(ii,zr,zi,pr);
+			mymp_rsh(ii,ii,pr*2,q-1);
+			mpn_sqr(zr,zr,pr);
+			mymp_rsh(zr,zr,pr*2,q);
+			mpn_sqr(zi,zi,pr);
+			mymp_rsh(zi,zi,pr*2,q);
+			mymp_add(zr,zr,zi,pr,0,1,&zrs);
+			mymp_add(zr,zr,cr,pr,zrs,crs,&zrs);
+			mymp_add(zi,ii,ci,pr,iis,cis,&zis);
+			mpn_sqr(ii,zr,pr);
+			mymp_rsh(ii,ii,pr*2,q);
+			mpn_sqr(i2,zi,pr);
+			mymp_rsh(i2,i2,pr*2,q);
+			mpn_add_n(ii,ii,i2,pr);
+		}while(--k&&mpn_cmp(ii,z4,pr)<0);
 		((unsigned char*)xv)[j]=(k<<8)/mxi;
 	}
 }
-
 int main(int argc,char**argv){
 	int nx,ny;
 	pthread_t a[THREADS];
-	xx=malloc(4*pr);
-	yy=malloc(4*pr);
-	wh=malloc(4*pr);
-	for(int i=0;i<pr;i++) xx[i]=yy[i]=wh[i]=0;
-	xx[0]=yy[0]=1;
-	xx[pr-1]=yy[pr-1]=2;
-	wh[pr-2]=0x02000000;
+	pr=1+(q+4)/mp_bits_per_limb;
+	xx=calloc(pr*4,sizeof(mp_limb_t));
+	yy=xx+pr;
+	wh=yy+pr;
+	z4=wh+pr;
+	yy[0]=xx[0]=2;
+	wh[0]=z4[0]=4;
+	mymp_lsh(xx,xx,pr,q);
+	mymp_lsh(yy,yy,pr,q);
+	mymp_lsh(z4,z4,pr,q);
+	mymp_lsh(wh,wh,pr,q-9);
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
-	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,512,512,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
+	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
 	GLXContext ctx=glXCreateContext(dpy,vi,0,GL_TRUE);
 	XEvent event;
 	glXMakeCurrent(dpy,win,ctx);
-	glOrtho(0,512,512,0,1,-1);
+	glOrtho(0,511,511,0,1,-1);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
 	pthread_attr_setstacksize(&pat,PTHREAD_STACK_MIN);
@@ -191,110 +103,81 @@ int main(int argc,char**argv){
     pthread_setschedparam(pthread_self(),SCHED_RR,(struct sched_param[]){{.sched_priority=sched_get_priority_min(SCHED_RR)}});
 	goto rend;
 	for(;;){
-		while(XPending(dpy)){
-			XNextEvent(dpy,&event);
-			switch(event.type){
-			case KeyPress:{
-				KeySym keysym;
-				if(XLookupString((XKeyEvent*)&event,(char[]){0},1,&keysym,NULL)==1&&keysym==XK_Escape){
-					glXDestroyContext(dpy,glXGetCurrentContext());
-					return 0;
-				}
+		XNextEvent(dpy,&event);
+		switch(event.type){
+		case KeyPress:{
+			KeySym keysym;
+			if(XLookupString((XKeyEvent*)&event,(char[]){0},1,&keysym,NULL)==1&&keysym==XK_Escape){
+				glXDestroyContext(dpy,glXGetCurrentContext());
+				return 0;
 			}
-			break;case Expose:
-				glBegin(GL_POINTS);
-				for(int i=0;i<512;i++)
-					for(int j=0;j<512;j++){
-						glColor3f(manor[i][j]*manor[i][j]*manor[i][j]/16777216.,manor[i][j]*manor[i][j]/65536.,manor[i][j]/256.);
-						glVertex2i(i,j);
-					}
-				glEnd();
-				glFlush();
-			break;case ButtonPress:
-				if(event.xbutton.button==Button1){
-					if((unsigned)event.xbutton.x>512||(unsigned)event.xbutton.y>512) break;
-					nx=event.xbutton.x;
-					ny=event.xbutton.y;
-				}else if(event.xbutton.button==Button4) mxi+=25;
-				else if(event.xbutton.button==Button5&&mxi>100) mxi-=25;
-				else goto rend;
-			break;case ButtonRelease:
-				if(event.xbutton.button==Button1){
-					if((unsigned)event.xbutton.x>512||(unsigned)event.xbutton.y>512) break;
-					if(event.xbutton.x==nx&&event.xbutton.y==ny){
-						uint32_t bx[pr];
-						for(int i=0;i<pr;i++) bx[i]=wh[i];
-						muli(bx,512-event.xbutton.x);
-						sub(xx,bx);
-						for(int i=0;i<pr;i++) bx[i]=wh[i];
-						muli(bx,512-event.xbutton.y);
-						sub(yy,bx);
-						int i2=pr-1;
-						do wh[i2]=wh[i2]<<1|wh[i2-1]>>31; while(--i2);
-					}else{
-						uint32_t bx[pr];
-						if(event.xbutton.x<nx){
-							int t=event.xbutton.x;
-							event.xbutton.x=nx;
-							nx=t;
-						}
-						if(event.xbutton.y<ny){
-							int t=event.xbutton.y;
-							event.xbutton.y=ny;
-							ny=t;
-						}
-						for(int i=0;i<pr;i++) bx[i]=wh[i];
-						muli(bx,nx);
-						add(xx,bx);
-						for(int i=0;i<pr;i++) bx[i]=wh[i];
-						muli(bx,ny);
-						add(yy,bx);
-						nx=event.xbutton.x-nx;
-						ny=event.xbutton.y-ny;
-						muli(wh,nx-(nx-ny&nx-ny>>sizeof(int)*8-1));
-						for(uint32_t i=1;i<pr-1;i++)
-							wh[i]=wh[i]>>9|(wh[i+1]&511)<<23;
-						wh[pr-1]>>=9;
-						if(!wh[2]&&wh[1]){
-							pr++;
-							xx=realloc(xx,4*pr);
-							yy=realloc(yy,4*pr);
-							wh=realloc(wh,4*pr);
-							for(int i=pr-1;i>1;i--){
-								xx[i]=xx[i-1];
-								yy[i]=yy[i-1];
-								wh[i]=wh[i-1];
-							}
-							xx[1]=yy[1]=wh[1]=0;
-						}
-					}
-					rend:;
-					prpr(xx);
-					prpr(yy);
-					prpr(wh);
-					puts("");
-					uint32_t n[THREADS],mans=THREADS-1;
-					for(int i=0;i<THREADS;i++){
-						n[i]=i;
-						pthread_create(a+i,&pat,drawman,manor+i);
-					}
-					while(mans<511+THREADS)
-						for(int i=0;i<THREADS;i++)
-							if(!pthread_tryjoin_np(a[i],0)){
-								int k=n[i];
-								if(++mans<512){
-									n[i]=mans;
-									pthread_create(a+i,&pat,drawman,manor+mans);
-								}
-								glBegin(GL_POINTS);
-								for(int j=0;j<512;j++){
-									glColor3ub(manor[k][j]*manor[k][j]*manor[k][j]>>16,manor[k][j]*manor[k][j]>>8,manor[k][j]);
-									glVertex2i(k,j);
-								}
-								glEnd();
-								glFlush();
-							}
+		}
+		break;case Expose:
+			glBegin(GL_POINTS);
+			for(int i=0;i<512;i++)
+				for(int j=0;j<512;j++){
+					glColor3f(manor[i][j]*manor[i][j]*manor[i][j]/16777216.,manor[i][j]*manor[i][j]/65536.,manor[i][j]/256.);
+					glVertex2i(i,j);
 				}
+			glEnd();
+			glFlush();
+		break;case ButtonPress:
+			if(event.xbutton.button==Button1){
+				if((unsigned)event.xbutton.x>512||(unsigned)event.xbutton.y>512) break;
+				nx=event.xbutton.x;
+				ny=event.xbutton.y;
+			}else if(event.xbutton.button==Button4) mxi+=25;
+			else if(event.xbutton.button==Button5&&mxi>100) mxi-=25;
+			else goto rend;
+		break;case ButtonRelease:
+			if(event.xbutton.button==Button1){
+				if((unsigned)event.xbutton.x>512||(unsigned)event.xbutton.y>512) break;
+				if(event.xbutton.x==nx&&event.xbutton.y==ny){
+					mpn_submul_1(xx,wh,pr,512-event.xbutton.x);
+					mpn_submul_1(yy,wh,pr,512-event.xbutton.y);
+					mpn_lshift(wh,wh,pr,1);
+				}else{
+					if(event.xbutton.x<nx){
+						int t=event.xbutton.x;
+						event.xbutton.x=nx;
+						nx=t;
+					}
+					if(event.xbutton.y<ny){
+						int t=event.xbutton.y;
+						event.xbutton.y=ny;
+						ny=t;
+					}
+					mpn_addmul_1(xx,wh,pr,nx);
+					mpn_addmul_1(yy,wh,pr,ny);
+					nx=event.xbutton.x-nx;
+					ny=event.xbutton.y-ny;
+					mpn_mul_1(wh,wh,pr,nx-(nx-ny&nx-ny>>sizeof(int)*8-1));
+					mpn_rshift(wh,wh,pr,9);
+				}
+				rend:;
+				gmp_printf("%u\n%Nx\n%Nx\n%Nx\n",q,xx,pr,yy,pr,wh,pr);
+				uint32_t n[THREADS],mans=THREADS-1;
+				for(int i=0;i<THREADS;i++){
+					n[i]=i;
+					pthread_create(a+i,&pat,drawman,manor+i);
+				}
+				while(mans<511+THREADS)
+					for(int i=0;i<THREADS;i++)
+						if(!pthread_tryjoin_np(a[i],0)){
+							int k=n[i];
+							if(++mans<512){
+								n[i]=mans;
+								pthread_create(a+i,&pat,drawman,manor+mans);
+							}
+							glBegin(GL_POINTS);
+							for(int j=0;j<512;j++){
+								glColor3ub(manor[k][j]*manor[k][j]*manor[k][j]>>16,manor[k][j]*manor[k][j]>>8,manor[k][j]);
+								glVertex2i(k,j);
+							}
+							glEnd();
+							glFlush();
+						}
+				return 0;
 			}
 		}
 	}
