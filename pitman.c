@@ -9,13 +9,11 @@
 #include <complex.h>
 #include <limits.h>
 #define THREADS 4
-
 long double xx=-2,yy=-2,wh=4/512.;
 unsigned char manor[512][512];
 unsigned mxi=200;
 Display*dpy;
 Window win;
-
 void*drawman(void*xv){
 	for(int j=0;j<512;j++){
 		complex long double z=xx+wh*(xv-(void*)manor>>9)+I*(yy+wh*j),c=z;
@@ -30,12 +28,12 @@ int main(int argc,char**argv){
 	pthread_t a[THREADS];
 	dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
-	win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,512,512,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
+	win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
 	GLXContext ctx=glXCreateContext(dpy,vi,0,GL_TRUE);
 	XEvent event;
 	glXMakeCurrent(dpy,win,ctx);
-	glOrtho(0,512,512,0,1,-1);
+	glOrtho(0,511,511,0,1,-1);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
 	pthread_attr_setstacksize(&pat,PTHREAD_STACK_MIN);

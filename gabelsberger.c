@@ -9,25 +9,11 @@
 #include <unistd.h>
 #include <limits.h>
 #define THREADS 4
-mp_limb_t*xx,*yy,*wh,*z4;
+mp_limb_t*xx,*yy,*wh;
 _Bool xs=1,ys=1;
 unsigned char manor[512][512];
-unsigned mxi=300,q;
+unsigned mxi=300;
 mp_size_t pr=1;
-mp_limb_t mymp_lsh(mp_limb_t*r,mp_size_t p,unsigned n){
-	while(n>=mp_bits_per_limb){
-		mpn_lshift(r,r,p,mp_bits_per_limb-1);
-		n-=mp_bits_per_limb-1;
-	}
-	return mpn_lshift(r,r,p,n);
-}
-mp_limb_t mymp_rsh(mp_limb_t*r,mp_size_t p,unsigned n){
-	while(n>=mp_bits_per_limb){
-		mpn_rshift(r,r,p,mp_bits_per_limb-1);
-		n-=mp_bits_per_limb-1;
-	}
-	return mpn_rshift(r,r,p,n);
-}
 void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*rs){
 	*rs=as;
 	if(as==bs) mpn_add_n(r,a,b,n);
@@ -43,7 +29,6 @@ void*drawman(void*xv){
 	mymp_add(cr,cr,xx,pr,0,xs,&crs);
 	mpn_copyi(ci,yy,pr);
 	cis=ys;
-	unsigned q=pr*mp_bits_per_limb-5;
 	for(mp_limb_t j=0;j<512;j++){
 		zrs=crs;
 		mpn_copyi(zr,cr,pr);
@@ -54,36 +39,30 @@ void*drawman(void*xv){
 		do{
 			iis=zrs^zis;
 			mpn_mul_n(ii,zr,zi,pr);
-			mymp_rsh(ii,pr*2,q-1);
+			mpn_lshift(ii+pr,ii+pr,pr,6);
 			mpn_sqr(zr,zr,pr);
-			mymp_rsh(zr,pr*2,q);
+			mpn_lshift(zr+pr,zr+pr,pr,5);
 			mpn_sqr(zi,zi,pr);
-			mymp_rsh(zi,pr*2,q);
-			mymp_add(zr,zr,zi,pr,0,1,&zrs);
+			mpn_lshift(zi+pr,zi+pr,pr,5);
+			mymp_add(zr,zr+pr,zi+pr,pr,0,1,&zrs);
 			mymp_add(zr,zr,cr,pr,zrs,crs,&zrs);
-			mymp_add(zi,ii,ci,pr,iis,cis,&zis);
+			mymp_add(zi,ii+pr,ci,pr,iis,cis,&zis);
 			mpn_sqr(ii,zr,pr);
-			mymp_rsh(ii,pr*2,q);
+			mpn_lshift(ii+pr,ii+pr,pr,5);
 			mpn_sqr(i2,zi,pr);
-			mymp_rsh(i2,pr*2,q);
-			mpn_add_n(ii,ii,i2,pr);
-		}while(--k&&mpn_cmp(ii,z4,pr)<0);
+			mpn_lshift(i2+pr,i2+pr,pr,5);
+			mpn_add_n(ii+pr,ii+pr,i2+pr,pr);
+		}while(--k&&ii[pr*2-1]<(4UL<<mp_bits_per_limb-5));
 		((unsigned char*)xv)[j]=(k<<8)/mxi;
 	}
 }
 int main(int argc,char**argv){
 	int nx,ny;
 	pthread_t a[THREADS];
-	xx=calloc(pr*4,sizeof(mp_limb_t));
-	yy=xx+pr;
-	wh=yy+pr;
-	z4=wh+pr;
-	yy[0]=xx[0]=2;
-	wh[0]=z4[0]=4;
-	mymp_lsh(xx,pr,pr*mp_bits_per_limb-5);
-	mymp_lsh(yy,pr,pr*mp_bits_per_limb-5);
-	mymp_lsh(z4,pr,pr*mp_bits_per_limb-5);
-	mymp_lsh(wh,pr,pr*mp_bits_per_limb-14);
+	xx=calloc(3,sizeof(mp_limb_t));
+	yy=xx+1;
+	wh=yy+1;
+	wh[0]=(yy[0]=xx[0]=2ULL<<mp_bits_per_limb-5)>>8;
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
 	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
@@ -121,13 +100,16 @@ int main(int argc,char**argv){
 			glEnd();
 			glFlush();
 		break;case ButtonPress:
-			if(ev.xbutton.button==Button1){
+			switch(ev.xbutton.button){
+			default:goto rend;
+			case Button1:
 				if((unsigned)ev.xbutton.x>512||(unsigned)ev.xbutton.y>512) break;
 				nx=ev.xbutton.x;
 				ny=ev.xbutton.y;
-			}else if(ev.xbutton.button==Button4) mxi+=25;
-			else if(ev.xbutton.button==Button5&&mxi>100) mxi-=25;
-			else goto rend;
+			break;case Button4:case Button5:
+				mxi+=ev.xbutton.button==Button4?25:mxi>25?-25:0;
+				printf("%d ",mxi);
+			}
 		break;case ButtonRelease:
 			if(ev.xbutton.button==Button1){
 				if((unsigned)ev.xbutton.x>512||(unsigned)ev.xbutton.y>512) break;
@@ -190,17 +172,15 @@ int main(int argc,char**argv){
 					mpn_rshift(wh,wh,pr,9);
 					if(xx[0]||yy[0]){
 						pr++;
-						xx=realloc(xx,pr*4*sizeof(mp_limb_t));
+						xx=realloc(xx,pr*3*sizeof(mp_limb_t));
 						yy=xx+pr;
 						wh=yy+pr;
-						z4=wh+pr;
-						for(int i=pr-1;i>-1;i--){
-							z4[i]=z4[i-4];
+						for(int i=pr-1;i;i--){
 							wh[i]=wh[i-3];
 							yy[i]=yy[i-2];
 							xx[i]=xx[i-1];
 						}
-						xx[0]=yy[0]=wh[0]=z4[0]=0;
+						xx[0]=yy[0]=wh[0]=0;
 					}
 				}
 				rend:gmp_printf("%u\n%Nx\n%Nx\n%Nx\n",pr,xx,pr,yy,pr,wh,pr);
@@ -225,7 +205,6 @@ int main(int argc,char**argv){
 							glEnd();
 							glFlush();
 						}
-				return 0;
 			}
 		}
 	}
