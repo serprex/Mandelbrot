@@ -84,7 +84,8 @@ int main(int argc,char**argv){
 			switch(ev.type){
 			case KeyPress:{
 				KeySym keysym;
-				if(XLookupString((XKeyEvent*)&ev,(char[]){0},1,&keysym,NULL)==1&&keysym==XK_Escape){
+				char buff;
+				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1&&keysym==XK_Escape){
 					glXDestroyContext(dpy,glXGetCurrentContext());
 					return 0;
 				}
@@ -192,7 +193,6 @@ int main(int argc,char**argv){
 						pthread_create(a+i,&pat,drawman,manor+mans);
 					}else if(mans>=511+THREADS){
 						mans=0;
-						return 0;
 						break;
 					}
 					glBegin(GL_POINTS);
