@@ -1,13 +1,13 @@
 #define _GNU_SOURCE
 #include <pthread.h>
-#include <gmp.h>
 #include <sched.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <unistd.h>
 #include <limits.h>
+#include <stdlib.h>
+#include <gmp.h>
 #define THREADS 4
 mp_limb_t*xx,*yy,*wh;
 _Bool xs=1,ys=1;
@@ -23,7 +23,7 @@ void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool 
 	}else mpn_sub_n(r,a,b,n);
 }
 void*drawman(void*xv){
-	mp_limb_t zr[pr*2],zi[pr*2],ii[pr*2],i2[pr*2],cr[pr*2],ci[pr*2];
+	mp_limb_t zr[pr*2],zi[pr*2],ii[pr*2],i2[pr*2],cr[pr],ci[pr];
 	_Bool zrs,zis,crs,cis,iis;
 	mpn_mul_1(cr,wh,pr,xv-(void*)manor>>9);
 	mymp_add(cr,cr,xx,pr,0,xs,&crs);
@@ -41,23 +41,20 @@ void*drawman(void*xv){
 			mpn_mul_n(ii,zr,zi,pr);
 			mpn_lshift(ii+pr,ii+pr,pr,6);
 			mpn_sqr(zr,zr,pr);
-			mpn_lshift(zr+pr,zr+pr,pr,5);
 			mpn_sqr(zi,zi,pr);
-			mpn_lshift(zi+pr,zi+pr,pr,5);
 			mymp_add(zr,zr+pr,zi+pr,pr,0,1,&zrs);
+			mpn_lshift(zr,zr,pr,5);
 			mymp_add(zr,zr,cr,pr,zrs,crs,&zrs);
 			mymp_add(zi,ii+pr,ci,pr,iis,cis,&zis);
 			mpn_sqr(ii,zr,pr);
-			mpn_lshift(ii+pr,ii+pr,pr,5);
 			mpn_sqr(i2,zi,pr);
-			mpn_lshift(i2+pr,i2+pr,pr,5);
 			mpn_add_n(ii+pr,ii+pr,i2+pr,pr);
-		}while(--k&&ii[pr*2-1]<(4UL<<mp_bits_per_limb-5));
+		}while(--k&&ii[pr*2-1]<(4UL<<mp_bits_per_limb-10));
 		((unsigned char*)xv)[j]=(k<<8)/mxi;
 	}
 }
 int main(int argc,char**argv){
-	int nx,ny,n[THREADS],mans=THREADS-1;
+	int nx,ny,n[THREADS],mans=0;
 	pthread_t a[THREADS];
 	wh=(yy=(xx=malloc(3*sizeof(mp_limb_t)))+1)+1;
 	wh[0]=(yy[0]=xx[0]=2ULL<<mp_bits_per_limb-5)>>8;
@@ -70,7 +67,6 @@ int main(int argc,char**argv){
 	glOrtho(0,511,511,0,1,-1);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
-	pthread_attr_setstacksize(&pat,PTHREAD_STACK_MIN);
 	pthread_attr_setguardsize(&pat,0);
 	pthread_attr_setinheritsched(&pat,PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&pat,SCHED_RR);
@@ -85,10 +81,7 @@ int main(int argc,char**argv){
 			case KeyPress:{
 				KeySym keysym;
 				char buff;
-				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1&&keysym==XK_Escape){
-					glXDestroyContext(dpy,glXGetCurrentContext());
-					return 0;
-				}
+				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1&&keysym==XK_Escape)return 0;
 			}
 			break;case Expose:
 				glBegin(GL_POINTS);
@@ -106,19 +99,16 @@ int main(int argc,char**argv){
 					if((unsigned)ev.xbutton.x>=512||(unsigned)ev.xbutton.y>=512)break;
 					nx=ev.xbutton.x;
 					ny=ev.xbutton.y;
-				break;case Button4:case Button5:
-					mxi+=ev.xbutton.button==Button4?25:mxi>25?-25:0;
-					printf("%d ",mxi);
+				break;case Button4:case Button5:mxi+=ev.xbutton.button==Button4?25:mxi>25?-25:0;
 				}
 			break;case ButtonRelease:
-				if(ev.xbutton.button==Button1){
-					if((unsigned)ev.xbutton.x>=512||(unsigned)ev.xbutton.y>=512)break;
+				if(ev.xbutton.button==Button1&&(unsigned)ev.xbutton.x<512&&(unsigned)ev.xbutton.y<512){
 					if(mans)
 						for(int i=0;i<THREADS;i++)pthread_join(a[i],0);
 					if(ev.xbutton.x==nx&&ev.xbutton.y==ny){
+						mp_limb_t t[pr];
 						if(xs)mpn_addmul_1(xx,wh,pr,512-ev.xbutton.x);
 						else{
-							mp_limb_t t[pr*2];
 							mpn_mul_1(t,wh,pr,512-ev.xbutton.x);
 							if(mpn_cmp(xx,t,pr)<0){
 								xs=!xs;
@@ -127,7 +117,6 @@ int main(int argc,char**argv){
 						}
 						if(ys)mpn_addmul_1(yy,wh,pr,512-ev.xbutton.y);
 						else{
-							mp_limb_t t[pr*2];
 							mpn_mul_1(t,wh,pr,512-ev.xbutton.y);
 							if(mpn_cmp(yy,t,pr)<0){
 								ys=!ys;
@@ -146,8 +135,8 @@ int main(int argc,char**argv){
 							ev.xbutton.y=ny;
 							ny=t;
 						}
+						mp_limb_t t[pr];
 						if(xs){
-							mp_limb_t t[pr*2];
 							mpn_mul_1(t,wh,pr,nx);
 							if(mpn_cmp(xx,t,pr)<0){
 								xs=!xs;
@@ -155,7 +144,6 @@ int main(int argc,char**argv){
 							}else mpn_sub_n(xx,xx,t,pr);
 						}else mpn_addmul_1(xx,wh,pr,nx);
 						if(ys){
-							mp_limb_t t[pr*2];
 							mpn_mul_1(t,wh,pr,ny);
 							if(mpn_cmp(yy,t,pr)<0){
 								ys=!ys;
@@ -175,7 +163,7 @@ int main(int argc,char**argv){
 							xx[yy[wh[0]=0]=0]=0;
 						}
 					}
-					rend:gmp_printf("%u\n%Nx\n%Nx\n%Nx\n",pr,xx,pr,yy,pr,wh,pr);
+					rend:gmp_printf("%u %u\n%Nx\n%Nx\n%Nx\n",pr,mxi,xx,pr,yy,pr,wh,pr);
 					mans=THREADS-1;
 					for(int i=0;i<THREADS;i++){
 						n[i]=i;

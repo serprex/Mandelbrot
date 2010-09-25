@@ -5,9 +5,9 @@
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <unistd.h>
+#include <limits.h>
 #include <math.h>
 #include <complex.h>
-#include <limits.h>
 #define THREADS 4
 long double xx=-2,yy=-2,wh=4/512.;
 unsigned char manor[512][512];
@@ -21,7 +21,7 @@ void*drawman(void*xv){
 	}
 }
 int main(int argc,char**argv){
-	int nx,ny,n[THREADS],mans=THREADS-1;
+	int nx,ny,n[THREADS],mans=0;
 	pthread_t a[THREADS];
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
@@ -32,7 +32,6 @@ int main(int argc,char**argv){
 	glOrtho(0,511,511,0,1,-1);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
-	pthread_attr_setstacksize(&pat,PTHREAD_STACK_MIN);
 	pthread_attr_setguardsize(&pat,0);
 	pthread_attr_setinheritsched(&pat,PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&pat,SCHED_RR);
@@ -47,10 +46,7 @@ int main(int argc,char**argv){
 			case KeyPress:{
 				KeySym keysym;
 				char buff;
-				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1&&keysym==XK_Escape){
-					glXDestroyContext(dpy,glXGetCurrentContext());
-					return 0;
-				}
+				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1&&keysym==XK_Escape)return 0;
 			}
 			break;case Expose:
 				glBegin(GL_POINTS);
@@ -68,13 +64,10 @@ int main(int argc,char**argv){
 					if((unsigned)ev.xbutton.x>=512||(unsigned)ev.xbutton.y>=512)break;
 					nx=ev.xbutton.x;
 					ny=ev.xbutton.y;
-				break;case Button4:case Button5:
-					mxi+=ev.xbutton.button==Button4?25:mxi>25?-25:0;
-					printf("%d ",mxi);
+				break;case Button4:case Button5:mxi+=ev.xbutton.button==Button4?25:mxi>25?-25:0;
 				}
 			break;case ButtonRelease:
-				if(ev.xbutton.button==Button1){
-					if((unsigned)ev.xbutton.x>=512||(unsigned)ev.xbutton.y>=512)break;
+				if(ev.xbutton.button==Button1&&(unsigned)ev.xbutton.x<512&&(unsigned)ev.xbutton.y<512){
 					if(mans)
 						for(int i=0;i<THREADS;i++)pthread_join(a[i],0);
 					if(ev.xbutton.x==nx&&ev.xbutton.y==ny){
@@ -98,7 +91,7 @@ int main(int argc,char**argv){
 						ny=ev.xbutton.y-ny;
 						wh*=(nx-(nx-ny&nx-ny>>sizeof(int)*8-1))/512.;
 					}
-					rend:printf("%Lf\n%Lf\n%Lf\n\n",xx,yy,wh);
+					rend:printf("%u\n%Lf\n%Lf\n%Lf\n\n",mxi,xx,yy,wh);
 					mans=THREADS-1;
 					for(int i=0;i<THREADS;i++){
 						n[i]=i;
