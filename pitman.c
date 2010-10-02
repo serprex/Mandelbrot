@@ -33,10 +33,6 @@ int main(int argc,char**argv){
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
 	pthread_attr_setguardsize(&pat,0);
-	pthread_attr_setinheritsched(&pat,PTHREAD_EXPLICIT_SCHED);
-	pthread_attr_setschedpolicy(&pat,SCHED_RR);
-	pthread_attr_setschedparam(&pat,(struct sched_param[]){{.sched_priority=sched_get_priority_max(SCHED_RR)}});
-	pthread_setschedparam(pthread_self(),SCHED_RR,(struct sched_param[]){{.sched_priority=sched_get_priority_min(SCHED_RR)}});
 	goto rend;
 	for(;;){
 		XEvent ev;
@@ -109,6 +105,7 @@ int main(int argc,char**argv){
 						pthread_create(a+i,&pat,drawman,manor+mans);
 					}else if(mans>=511+THREADS){
 						mans=0;
+						glFlush();
 						break;
 					}
 					glBegin(GL_POINTS);
@@ -117,7 +114,6 @@ int main(int argc,char**argv){
 						glVertex2i(k,j);
 					}
 					glEnd();
-					glFlush();
 				}
 	}
 }

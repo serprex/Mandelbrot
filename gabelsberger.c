@@ -24,16 +24,15 @@ void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool 
 }
 void*drawman(void*xv){
 	mp_limb_t zr[pr*2],zi[pr*2],ii[pr*2],i2[pr*2],cr[pr],ci[pr];
-	_Bool zrs,zis,crs,cis,iis;
+	_Bool zrs,zis,crs,cis=ys,iis;
 	mpn_mul_1(cr,wh,pr,xv-(void*)manor>>9);
 	mymp_add(cr,cr,xx,pr,0,xs,&crs);
 	mpn_copyi(ci,yy,pr);
-	cis=ys;
-	for(mp_limb_t j=0;j<512;j++){
+	for(int j=0;j<512;j++){
 		zrs=crs;
+		zis=cis;
 		mpn_copyi(zr,cr,pr);
 		mymp_add(ci,ci,wh,pr,cis,0,&cis);
-		zis=cis;
 		mpn_copyi(zi,ci,pr);
 		unsigned k=mxi;
 		do{
@@ -68,10 +67,6 @@ int main(int argc,char**argv){
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
 	pthread_attr_setguardsize(&pat,0);
-	pthread_attr_setinheritsched(&pat,PTHREAD_EXPLICIT_SCHED);
-	pthread_attr_setschedpolicy(&pat,SCHED_RR);
-	pthread_attr_setschedparam(&pat,(struct sched_param[]){{.sched_priority=sched_get_priority_max(SCHED_RR)}});
-	pthread_setschedparam(pthread_self(),SCHED_RR,(struct sched_param[]){{.sched_priority=sched_get_priority_min(SCHED_RR)}});
 	goto rend;
 	for(;;){
 		XEvent ev;
@@ -181,6 +176,7 @@ int main(int argc,char**argv){
 						pthread_create(a+i,&pat,drawman,manor+mans);
 					}else if(mans>=511+THREADS){
 						mans=0;
+						glFlush();
 						break;
 					}
 					glBegin(GL_POINTS);
@@ -189,7 +185,6 @@ int main(int argc,char**argv){
 						glVertex2i(k,j);
 					}
 					glEnd();
-					glFlush();
 				}
 	}
 }
