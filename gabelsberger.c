@@ -1,11 +1,9 @@
 #define _GNU_SOURCE
 #include <pthread.h>
-#include <sched.h>
 #include <stdio.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <unistd.h>
-#include <limits.h>
 #include <stdlib.h>
 #include <gmp.h>
 #define THREADS 4
@@ -48,13 +46,19 @@ void*drawman(void*xv){
 			mpn_sqr(ii,zr,pr);
 			mpn_sqr(i2,zi,pr);
 			mpn_add_n(ii+pr,ii+pr,i2+pr,pr);
-		}while(--k&&ii[pr*2-1]<(4UL<<mp_bits_per_limb-10));
+		}while(--k&&ii[pr*2-1]<(4ULL<<mp_bits_per_limb-10));
 		((unsigned char*)xv)[j]=(k<<8)/mxi;
 	}
 }
 int main(int argc,char**argv){
 	int nx,ny,n[THREADS],mans=0;
 	pthread_t a[THREADS];
+	unsigned char col[256][3];
+	for(int i=0;i<256;i++){
+		col[i][0]=i*i*i>>16;
+		col[i][1]=i*i>>8;
+		col[i][2]=i;
+	}
 	wh=(yy=(xx=malloc(3*sizeof(mp_limb_t)))+1)+1;
 	wh[0]=(yy[0]=xx[0]=2ULL<<mp_bits_per_limb-5)>>8;
 	Display*dpy=XOpenDisplay(0);
@@ -82,7 +86,7 @@ int main(int argc,char**argv){
 				glBegin(GL_POINTS);
 				for(int i=0;i<512;i++)
 					for(int j=0;j<512;j++){
-						glColor3ub(manor[i][j]*manor[i][j]*manor[i][j]>>16,manor[i][j]*manor[i][j]>>8,manor[i][j]);
+						glColor3ubv(col[manor[i][j]]);
 						glVertex2i(i,j);
 					}
 				glEnd();
@@ -181,7 +185,7 @@ int main(int argc,char**argv){
 					}
 					glBegin(GL_POINTS);
 					for(int j=0;j<512;j++){
-						glColor3ub(manor[k][j]*manor[k][j]*manor[k][j]>>16,manor[k][j]*manor[k][j]>>8,manor[k][j]);
+						glColor3ubv(col[manor[k][j]]);
 						glVertex2i(k,j);
 					}
 					glEnd();

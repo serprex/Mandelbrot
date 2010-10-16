@@ -1,11 +1,8 @@
 #define _GNU_SOURCE
 #include <pthread.h>
-#include <sched.h>
 #include <stdio.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
-#include <unistd.h>
-#include <limits.h>
 #include <math.h>
 #include <complex.h>
 #define THREADS 4
