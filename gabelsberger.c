@@ -175,7 +175,6 @@ int main(int argc,char**argv){
 						n[i]=mans;
 						pthread_create(a+i,&pat,drawman,manor+mans);
 					}else a[i]=0;
-					fprintf(stderr,"%d ",k);
 					glBegin(GL_POINTS);
 					for(int j=0;j<512;j++){
 						glColor3ubv(col[manor[k][j]]);
