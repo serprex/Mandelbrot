@@ -70,7 +70,7 @@ int main(int argc,char**argv){
 	goto rend;
 	for(;;){
 		XEvent ev;
-		if(XPending(dpy)){
+		if(XPending(dpy)||!mans){
 			XNextEvent(dpy,&ev);
 			switch(ev.type){
 			case KeyPress:{
