@@ -2,7 +2,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <GL/glx.h>
-#include <GL/gl.h>
 #include <math.h>
 #include <complex.h>
 #define THREADS 4
@@ -20,12 +19,17 @@ void*drawman(void*xv){
 int main(int argc,char**argv){
 	int nx,ny,n[THREADS],mans=0;
 	pthread_t a[THREADS];
+	unsigned char col[256][3];
+	for(int i=0;i<256;i++){
+		col[i][0]=i*i*i>>16;
+		col[i][1]=i*i>>8;
+		col[i][2]=i;
+	}
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
-	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
+	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
-	GLXContext ctx=glXCreateContext(dpy,vi,0,GL_TRUE);
-	glXMakeCurrent(dpy,win,ctx);
+	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	glOrtho(0,511,511,0,1,-1);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
@@ -39,13 +43,13 @@ int main(int argc,char**argv){
 			case KeyPress:{
 				KeySym keysym;
 				char buff;
-				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1&&keysym==XK_Escape)return 0;
+				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,0)==1&&keysym==XK_Escape)return 0;
 			}
 			break;case Expose:
 				glBegin(GL_POINTS);
-				for(int i=0;i<512;i++)
-					for(int j=0;j<512;j++){
-						glColor3ub(manor[i][j]*manor[i][j]*manor[i][j]>>16,manor[i][j]*manor[i][j]>>8,manor[i][j]);
+				for(int i=ev.xexpose.x;i<=ev.xexpose.x+ev.xexpose.width;i++)
+					for(int j=ev.xexpose.y;j<=ev.xexpose.y+ev.xexpose.height;j++){
+						glColor3ubv(col[manor[i][j]]);
 						glVertex2i(i,j);
 					}
 				glEnd();
@@ -95,22 +99,23 @@ int main(int argc,char**argv){
 		}
 		if(mans)
 			for(int i=0;i<THREADS;i++)
-				if(!pthread_tryjoin_np(a[i],0)){
+				if(a[i]&&!pthread_tryjoin_np(a[i],0)){
 					int k=n[i];
 					if(++mans<512){
 						n[i]=mans;
 						pthread_create(a+i,&pat,drawman,manor+mans);
-					}else if(mans>=511+THREADS){
+					}else a[i]=0;
+					glBegin(GL_POINTS);
+					for(int j=0;j<512;j++){
+						glColor3ubv(col[manor[k][j]]);
+						glVertex2i(k,j);
+					}
+					glEnd();
+					if(mans>=511+THREADS){
 						mans=0;
 						glFlush();
 						break;
 					}
-					glBegin(GL_POINTS);
-					for(int j=0;j<512;j++){
-						glColor3ub(manor[k][j]*manor[k][j]*manor[k][j]>>16,manor[k][j]*manor[k][j]>>8,manor[k][j]);
-						glVertex2i(k,j);
-					}
-					glEnd();
 				}
 	}
 }

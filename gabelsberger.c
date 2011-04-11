@@ -2,8 +2,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <GL/glx.h>
-#include <GL/gl.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <gmp.h>
 #define THREADS 4
@@ -12,16 +10,16 @@ _Bool xs=1,ys=1;
 unsigned char manor[512][512];
 unsigned mxi=300;
 mp_size_t pr=1;
-void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*rs){
+static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*rs){
 	*rs=as;
-	if(as==bs) mpn_add_n(r,a,b,n);
+	if(as==bs)mpn_add_n(r,a,b,n);
 	else if(mpn_cmp(a,b,n)<0){
 		*rs=!as;
 		mpn_sub_n(r,b,a,n);
 	}else mpn_sub_n(r,a,b,n);
 }
 void*drawman(void*xv){
-	mp_limb_t zr[pr*2],zi[pr*2],ii[pr*2],i2[pr*2],cr[pr],ci[pr];
+	mp_limb_t cr[pr],ci[pr],zr[pr],zi[pr],ii[pr*2],i2[pr*2],z2[pr*2];
 	_Bool zrs,zis,crs,cis=ys,iis;
 	mpn_mul_1(cr,wh,pr,xv-(void*)manor>>9);
 	mymp_add(cr,cr,xx,pr,0,xs,&crs);
@@ -36,17 +34,16 @@ void*drawman(void*xv){
 		do{
 			iis=zrs^zis;
 			mpn_mul_n(ii,zr,zi,pr);
-			mpn_lshift(ii+pr,ii+pr,pr,6);
-			mpn_sqr(zr,zr,pr);
-			mpn_sqr(zi,zi,pr);
-			mymp_add(zr,zr+pr,zi+pr,pr,0,1,&zrs);
-			mpn_lshift(zr,zr,pr,5);
+			mpn_lshift(ii+pr,ii+pr,pr,5);
+			mpn_sqr(z2,zr,pr);
+			mpn_sqr(i2,zi,pr);
+			mymp_add(zr,z2+pr,i2+pr,pr,0,1,&zrs);
+			mpn_lshift(zr,zr,pr,4);
 			mymp_add(zr,zr,cr,pr,zrs,crs,&zrs);
 			mymp_add(zi,ii+pr,ci,pr,iis,cis,&zis);
 			mpn_sqr(ii,zr,pr);
 			mpn_sqr(i2,zi,pr);
-			mpn_add_n(ii+pr,ii+pr,i2+pr,pr);
-		}while(--k&&ii[pr*2-1]<(4ULL<<mp_bits_per_limb-10));
+		}while(--k&&ii[pr*2-1]+i2[pr*2-1]<(1ULL<<mp_bits_per_limb-6));
 		((unsigned char*)xv)[j]=(k<<8)/mxi;
 	}
 }
@@ -60,13 +57,12 @@ int main(int argc,char**argv){
 		col[i][2]=i;
 	}
 	wh=(yy=(xx=malloc(3*sizeof(mp_limb_t)))+1)+1;
-	wh[0]=(yy[0]=xx[0]=2ULL<<mp_bits_per_limb-5)>>8;
+	wh[0]=(yy[0]=xx[0]=1ULL<<mp_bits_per_limb-3)>>8;
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
-	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWBorderPixel|CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
+	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
-	GLXContext ctx=glXCreateContext(dpy,vi,0,GL_TRUE);
-	glXMakeCurrent(dpy,win,ctx);
+	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	glOrtho(0,511,511,0,1,-1);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
@@ -80,12 +76,12 @@ int main(int argc,char**argv){
 			case KeyPress:{
 				KeySym keysym;
 				char buff;
-				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1&&keysym==XK_Escape)return 0;
+				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,0)==1&&keysym==XK_Escape)return 0;
 			}
 			break;case Expose:
 				glBegin(GL_POINTS);
-				for(int i=0;i<512;i++)
-					for(int j=0;j<512;j++){
+				for(int i=ev.xexpose.x;i<=ev.xexpose.x+ev.xexpose.width;i++)
+					for(int j=ev.xexpose.y;j<=ev.xexpose.y+ev.xexpose.height;j++){
 						glColor3ubv(col[manor[i][j]]);
 						glVertex2i(i,j);
 					}
@@ -153,7 +149,7 @@ int main(int argc,char**argv){
 						ny=ev.xbutton.y-ny;
 						mpn_mul_1(wh,wh,pr,nx-(nx-ny&nx-ny>>sizeof(int)*8-1));
 						mpn_rshift(wh,wh,pr,9);
-						if(xx[0]||yy[0]||wh[0]){
+						if(xx[0]&4095||yy[0]&4095||wh[0]&4095){
 							pr++;
 							wh=(yy=(xx=realloc(xx,pr*3*sizeof(mp_limb_t)))+pr)+pr;
 							mpn_copyd(wh+1,wh-2,pr-1);
@@ -173,22 +169,24 @@ int main(int argc,char**argv){
 		}
 		if(mans)
 			for(int i=0;i<THREADS;i++)
-				if(!pthread_tryjoin_np(a[i],0)){
+				if(a[i]&&!pthread_tryjoin_np(a[i],0)){
 					int k=n[i];
 					if(++mans<512){
 						n[i]=mans;
 						pthread_create(a+i,&pat,drawman,manor+mans);
-					}else if(mans>=511+THREADS){
-						mans=0;
-						glFlush();
-						break;
-					}
+					}else a[i]=0;
+					fprintf(stderr,"%d ",k);
 					glBegin(GL_POINTS);
 					for(int j=0;j<512;j++){
 						glColor3ubv(col[manor[k][j]]);
 						glVertex2i(k,j);
 					}
 					glEnd();
+					if(mans>=511+THREADS){
+						mans=0;
+						glFlush();
+						break;
+					}
 				}
 	}
 }
