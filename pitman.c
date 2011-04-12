@@ -27,7 +27,7 @@ int main(int argc,char**argv){
 	}
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
-	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.border_pixel=0,.event_mask=ExposureMask|KeyPressMask|ButtonPressMask|ButtonReleaseMask}});
+	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=ExposureMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
 	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	glOrtho(0,511,511,0,1,-1);
@@ -40,12 +40,7 @@ int main(int argc,char**argv){
 		if(XPending(dpy)||!mans){
 			XNextEvent(dpy,&ev);
 			switch(ev.type){
-			case KeyPress:{
-				KeySym keysym;
-				char buff;
-				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,0)==1&&keysym==XK_Escape)return 0;
-			}
-			break;case Expose:
+			case Expose:
 				glBegin(GL_POINTS);
 				for(int i=ev.xexpose.x;i<=ev.xexpose.x+ev.xexpose.width;i++)
 					for(int j=ev.xexpose.y;j<=ev.xexpose.y+ev.xexpose.height;j++){
