@@ -4,26 +4,39 @@
 #include <GL/glx.h>
 #include <math.h>
 #include <complex.h>
+#include <string.h>
 #define THREADS 4
+_Bool pull;
 long double xx=-2,yy=-2,wh=4/512.;
 unsigned char manor[512][512];
+unsigned long long done[8];
 unsigned mxi=300;
-void*drawman(void*xv){
-	for(int j=0;j<512;j++){
-		complex long double z=xx+wh*(xv-(void*)manor>>9)+I*(yy+wh*j),c=z;
-		unsigned k=mxi;
-		while(--k&&cabsl(z=z*z+c)<2);
-		((unsigned char*)xv)[j]=(k<<8)/mxi;
+pthread_mutex_t xcol;
+int col;
+void*drawman(void*x){
+	int c=-1;
+	for(;;){
+		pthread_mutex_lock(&xcol);
+		if(c!=-1)done[c>>6]|=1ULL<<(c&63);
+		c=col++;
+		pthread_mutex_unlock(&xcol);
+		if(c>=512)return 0;
+		for(int j=0;j<512;j++){
+			complex long double z=xx+wh*c+I*(yy+wh*j),y=z;
+			unsigned k=mxi;
+			while(--k&&cabsl(z=z*z+y)<2);
+			manor[c][j]=(k<<8)/mxi;
+		}
 	}
 }
 int main(int argc,char**argv){
-	int nx,ny,n[THREADS],mans=0;
+	int nx,ny,mans=-1;
 	pthread_t a[THREADS];
-	unsigned char col[256][3];
+	unsigned char C[256][3];
 	for(int i=0;i<256;i++){
-		col[i][0]=i*i*i>>16;
-		col[i][1]=i*i>>8;
-		col[i][2]=i;
+		C[i][0]=i*i*i>>16;
+		C[i][1]=i*i>>8;
+		C[i][2]=i;
 	}
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
@@ -31,20 +44,21 @@ int main(int argc,char**argv){
 	XMapWindow(dpy,win);
 	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	glOrtho(0,511,511,0,1,-1);
+	pthread_mutex_init(&xcol,0);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
 	pthread_attr_setguardsize(&pat,0);
 	goto rend;
 	for(;;){
 		XEvent ev;
-		if(XPending(dpy)||!mans){
-			XNextEvent(dpy,&ev);
+		ever:if(XPending(dpy)||mans==-1){
+			xne:XNextEvent(dpy,&ev);
 			switch(ev.type){
 			case Expose:
 				glBegin(GL_POINTS);
 				for(int i=ev.xexpose.x;i<=ev.xexpose.x+ev.xexpose.width;i++)
 					for(int j=ev.xexpose.y;j<=ev.xexpose.y+ev.xexpose.height;j++){
-						glColor3ubv(col[manor[i][j]]);
+						glColor3ubv(C[manor[i][j]]);
 						glVertex2i(i,j);
 					}
 				glEnd();
@@ -60,8 +74,13 @@ int main(int argc,char**argv){
 				}
 			break;case ButtonRelease:
 				if(ev.xbutton.button==Button1&&(unsigned)ev.xbutton.x<512&&(unsigned)ev.xbutton.y<512){
-					if(mans)
-						for(int i=0;i<THREADS;i++)pthread_join(a[i],0);
+					if(mans!=-1){
+						pull=1;
+						memset(done,0,64);
+						for(int i=0;i<THREADS;i++)
+							pthread_join(a[i],0);
+						pull=0;
+					}
 					if(ev.xbutton.x==nx&&ev.xbutton.y==ny){
 						xx+=(ev.xbutton.x-512)*wh;
 						yy+=(ev.xbutton.y-512)*wh;
@@ -84,33 +103,37 @@ int main(int argc,char**argv){
 						wh*=(nx-(nx-ny&nx-ny>>sizeof(int)*8-1))/512.;
 					}
 					rend:printf("%u\n%Lf\n%Lf\n%Lf\n\n",mxi,xx,yy,wh);
-					mans=THREADS-1;
-					for(int i=0;i<THREADS;i++){
-						n[i]=i;
+					mans=col=0;
+					for(int i=0;i<THREADS;i++)
 						pthread_create(a+i,&pat,drawman,manor+i);
-					}
 				}
 			}
 		}
-		if(mans)
-			for(int i=0;i<THREADS;i++)
-				if(a[i]&&!pthread_tryjoin_np(a[i],0)){
-					int k=n[i];
-					if(++mans<512){
-						n[i]=mans;
-						pthread_create(a+i,&pat,drawman,manor+mans);
-					}else a[i]=0;
-					glBegin(GL_POINTS);
-					for(int j=0;j<512;j++){
-						glColor3ubv(col[manor[k][j]]);
-						glVertex2i(k,j);
-					}
-					glEnd();
-					if(mans>=511+THREADS){
-						mans=0;
-						glFlush();
-						break;
+		if(mans!=-1){
+			pthread_mutex_lock(&xcol);
+			for(int i=mans>>6;i>=0;i--)
+				if(done[i]){
+					int lo=ffsll(done[i])-1,io=i*64+lo;
+					if(done[i]&1ULL<<lo){
+						done[i]^=1ULL<<lo;
+						pthread_mutex_unlock(&xcol);
+						glBegin(GL_POINTS);
+						for(int j=0;j<512;j++){
+							glColor3ubv(C[manor[io][j]]);
+							glVertex2i(io,j);
+						}
+						glEnd();
+						if(++mans==512){
+							for(int i=0;i<THREADS;i++)
+								pthread_join(a[i],0);
+							mans=-1;
+							glFlush();
+							goto xne;
+						}
+						goto ever;
 					}
 				}
+			pthread_mutex_unlock(&xcol);
+		}
 	}
 }
