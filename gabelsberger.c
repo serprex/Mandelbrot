@@ -60,7 +60,7 @@ void*drawman(void*x){
 	}
 }
 int main(int argc,char**argv){
-	int nx,ny,mans=-1;
+	int nx,ny,mans=512;
 	_Bool first=1;
 	pthread_t a[THREADS]={};
 	unsigned char C[256][3];
@@ -84,7 +84,7 @@ int main(int argc,char**argv){
 	goto rend;
 	for(;;){
 		XEvent ev;
-		ever:if(XPending(dpy)||mans==-1){
+		ever:if(XPending(dpy)||mans==512){
 			xne:XNextEvent(dpy,&ev);
 			switch(ev.type){
 			case Expose:
@@ -107,9 +107,9 @@ int main(int argc,char**argv){
 				}
 			break;case ButtonRelease:
 				if(ev.xbutton.button==Button1&&(unsigned)ev.xbutton.x<512&&(unsigned)ev.xbutton.y<512){
-					if(mans!=-1){
+					if(mans!=512){
 						pull=1;
-						memset(done,0,64);
+						memset(done,0,sizeof(done));
 						for(int i=0;i<THREADS;i++)
 							pthread_join(a[i],0);
 						pull=0;
@@ -179,14 +179,15 @@ int main(int argc,char**argv){
 				}
 			}
 		}
-		if(mans!=-1){
+		if(mans!=512){
 			pthread_mutex_lock(&xcol);
 			for(int i=mans>>6;i>=0;i--)
 				if(done[i]){
-					int lo=ffsll(done[i])-1,io=i*64+lo;
+					int lo=ffsll(done[i])-1;
 					if(done[i]&1ULL<<lo){
 						done[i]^=1ULL<<lo;
 						pthread_mutex_unlock(&xcol);
+						int io=i*64+lo;
 						glBegin(GL_POINTS);
 						for(int j=0;j<512;j++){
 							glColor3ubv(C[manor[io][j]]);
@@ -196,7 +197,6 @@ int main(int argc,char**argv){
 						if(++mans==512){
 							for(int i=0;i<THREADS;i++)
 								pthread_join(a[i],0);
-							mans=-1;
 							glFlush();
 							goto xne;
 						}
