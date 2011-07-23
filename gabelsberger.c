@@ -7,7 +7,8 @@
 #include <string.h>
 #define THREADS 4
 mp_limb_t*xx,*yy,*wh;
-_Bool xs=1,ys=1,pull;
+_Bool xs=1,ys=1;
+volatile _Bool pull;
 unsigned char manor[512][512];
 unsigned long long done[8];
 unsigned mxi=300;
@@ -60,7 +61,7 @@ void*drawman(void*x){
 	}
 }
 int main(int argc,char**argv){
-	int nx,ny,mans=512;
+	int nx,ny,mans=0;
 	_Bool first=1;
 	pthread_t a[THREADS]={};
 	unsigned char C[256][3];
@@ -81,7 +82,7 @@ int main(int argc,char**argv){
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
 	pthread_attr_setguardsize(&pat,0);
-	goto rend;
+	goto fend;
 	for(;;){
 		XEvent ev;
 		ever:if(XPending(dpy)||mans==512){
@@ -101,6 +102,7 @@ int main(int argc,char**argv){
 				default:goto rend;
 				case Button1:
 					if((unsigned)ev.xbutton.x>=512||(unsigned)ev.xbutton.y>=512)break;
+					case Button3:
 					nx=ev.xbutton.x;
 					ny=ev.xbutton.y;
 				break;case Button4:case Button5:mxi+=ev.xbutton.button==Button4?25:mxi>25?-25:0;
@@ -109,7 +111,6 @@ int main(int argc,char**argv){
 				if(ev.xbutton.button==Button1&&(unsigned)ev.xbutton.x<512&&(unsigned)ev.xbutton.y<512){
 					if(mans!=512){
 						pull=1;
-						memset(done,0,sizeof(done));
 						for(int i=0;i<THREADS;i++)
 							pthread_join(a[i],0);
 						pull=0;
@@ -144,6 +145,7 @@ int main(int argc,char**argv){
 							ev.xbutton.y=ny;
 							ny=t;
 						}
+						from3:;
 						mp_limb_t t[pr];
 						if(xs){
 							mpn_mul_1(t,wh,pr,nx);
@@ -159,23 +161,50 @@ int main(int argc,char**argv){
 								mpn_sub_n(yy,t,yy,pr);
 							}else mpn_sub_n(yy,yy,t,pr);
 						}else mpn_addmul_1(yy,wh,pr,ny);
-						nx=ev.xbutton.x-nx;
-						ny=ev.xbutton.y-ny;
-						mpn_mul_1(wh,wh,pr,nx-(nx-ny&nx-ny>>sizeof(int)*8-1));
-						mpn_rshift(wh,wh,pr,9);
-						if(*xx&4095||*yy&4095||*wh&4095){
-							pr++;
-							wh=(yy=(xx=realloc(xx,pr*3*sizeof(mp_limb_t)))+pr)+pr;
-							mpn_copyd(wh+1,wh-2,pr-1);
-							mpn_copyd(yy+1,yy-1,pr-1);
-							mpn_copyd(xx+1,xx,pr-1);
-							*xx=*yy=*wh=0;
+						if(ev.xbutton.button==Button1){
+							nx=ev.xbutton.x-nx;
+							ny=ev.xbutton.y-ny;
+							mpn_mul_1(wh,wh,pr,nx-(nx-ny&nx-ny>>sizeof(int)*8-1));
+							mpn_rshift(wh,wh,pr,9);
+							if(*xx&4095||*yy&4095||*wh&4095){
+								pr++;
+								wh=(yy=(xx=realloc(xx,pr*3*sizeof(mp_limb_t)))+pr)+pr;
+								mpn_copyd(wh+1,wh-2,pr-1);
+								mpn_copyd(yy+1,yy-1,pr-1);
+								mpn_copyd(xx+1,xx,pr-1);
+								*xx=*yy=*wh=0;
+							}
 						}
 					}
 					rend:gmp_printf("%u %u\n%Nx\n%Nx\n%Nx\n",pr,mxi,xx,pr,yy,pr,wh,pr);
-					mans=col=0;
 					for(int i=0;i<THREADS;i++)
+						pthread_join(a[i],0);
+					pull=0;
+					mans=col=0;
+					memset(done,0,sizeof(done));
+					fend:for(int i=0;i<THREADS;i++)
 						pthread_create(a+i,&pat,drawman,0);
+				}else if(ev.xbutton.button==Button3){
+					if(mans!=512)
+						pull=1;
+					nx-=ev.xbutton.x;
+					ny-=ev.xbutton.y;
+					mp_limb_t t[pr];
+					if(xs){
+						mpn_mul_1(t,wh,pr,nx);
+						if(mpn_cmp(xx,t,pr)<0){
+							xs=!xs;
+							mpn_sub_n(xx,t,xx,pr);
+						}else mpn_sub_n(xx,xx,t,pr);
+					}else mpn_addmul_1(xx,wh,pr,nx);
+					if(ys){
+						mpn_mul_1(t,wh,pr,ny);
+						if(mpn_cmp(yy,t,pr)<0){
+							ys=!ys;
+							mpn_sub_n(yy,t,yy,pr);
+						}else mpn_sub_n(yy,yy,t,pr);
+					}else mpn_addmul_1(yy,wh,pr,ny);
+					goto rend;
 				}
 			}
 		}

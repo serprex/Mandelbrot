@@ -6,7 +6,7 @@
 #include <complex.h>
 #include <string.h>
 #define THREADS 4
-_Bool pull;
+volatile _Bool pull;
 long double xx=-2,yy=-2,wh=4/512.;
 unsigned char manor[512][512];
 unsigned long long done[8];
@@ -30,7 +30,7 @@ void*drawman(void*x){
 	}
 }
 int main(int argc,char**argv){
-	int nx,ny,mans=512;
+	int nx,ny,mans=0;
 	pthread_t a[THREADS];
 	unsigned char C[256][3];
 	for(int i=0;i<256;i++){
@@ -48,7 +48,7 @@ int main(int argc,char**argv){
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
 	pthread_attr_setguardsize(&pat,0);
-	goto rend;
+	goto fend;
 	for(;;){
 		XEvent ev;
 		ever:if(XPending(dpy)||mans==512){
@@ -68,19 +68,15 @@ int main(int argc,char**argv){
 				default:goto rend;
 				case Button1:
 					if((unsigned)ev.xbutton.x>=512||(unsigned)ev.xbutton.y>=512)break;
+					case Button3:
 					nx=ev.xbutton.x;
 					ny=ev.xbutton.y;
 				break;case Button4:case Button5:mxi+=ev.xbutton.button==Button4?25:mxi>25?-25:0;
 				}
 			break;case ButtonRelease:
 				if(ev.xbutton.button==Button1&&(unsigned)ev.xbutton.x<512&&(unsigned)ev.xbutton.y<512){
-					if(mans!=512){
+					if(mans!=512)
 						pull=1;
-						memset(done,0,sizeof(done));
-						for(int i=0;i<THREADS;i++)
-							pthread_join(a[i],0);
-						pull=0;
-					}
 					if(ev.xbutton.x==nx&&ev.xbutton.y==ny){
 						xx+=(ev.xbutton.x-512)*wh;
 						yy+=(ev.xbutton.y-512)*wh;
@@ -96,16 +92,29 @@ int main(int argc,char**argv){
 							ev.xbutton.y=ny;
 							ny=t;
 						}
+						from3:
 						xx+=nx*wh;
 						yy+=ny*wh;
-						nx=ev.xbutton.x-nx;
-						ny=ev.xbutton.y-ny;
-						wh*=(nx-(nx-ny&nx-ny>>sizeof(int)*8-1))/512.;
+						if(ev.xbutton.button==Button1){
+							nx=ev.xbutton.x-nx;
+							ny=ev.xbutton.y-ny;
+							wh*=(nx-(nx-ny&nx-ny>>sizeof(int)*8-1))/512.;
+						}
 					}
 					rend:printf("%u\n%Lf\n%Lf\n%Lf\n\n",mxi,xx,yy,wh);
-					mans=col=0;
 					for(int i=0;i<THREADS;i++)
-						pthread_create(a+i,&pat,drawman,manor+i);
+						pthread_join(a[i],0);
+					pull=0;
+					mans=col=0;
+					memset(done,0,sizeof(done));
+					fend:for(int i=0;i<THREADS;i++)
+						pthread_create(a+i,&pat,drawman,0);
+				}else if(ev.xbutton.button==Button3){
+					if(mans!=512)
+						pull=1;
+					nx-=ev.xbutton.x;
+					ny-=ev.xbutton.y;
+					goto from3;
 				}
 			}
 		}
