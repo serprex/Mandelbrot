@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <CL/cl.h>
 #include <stdio.h>
 #include <GL/glx.h>
