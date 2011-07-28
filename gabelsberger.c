@@ -31,7 +31,7 @@ void*drawman(void*x){
 		c=col++;
 		pthread_mutex_unlock(&xcol);
 		if(c>=512||pull)return 0;
-		mp_limb_t cr[pr],ci[pr],zr[pr],zi[pr],ii[pr*2],i2[pr*2];
+		mp_limb_t cr[pr],ci[pr],zr[pr],zi[pr],ii[pr*2],i2[pr*2],r2[pr*2];
 		_Bool zrs,zis,crs,cis=ys,iis;
 		mpn_mul_1(cr,wh,pr,c);
 		mymp_add(cr,cr,xx,pr,0,xs,&crs);
@@ -39,23 +39,23 @@ void*drawman(void*x){
 		for(int j=0;j<512;j++){
 			zrs=crs;
 			zis=cis;
-			mpn_copyi(zr,cr,pr);
 			mymp_add(ci,ci,wh,pr,cis,0,&cis);
 			mpn_copyi(zi,ci,pr);
+			mpn_copyi(zr,cr,pr);
+			mpn_sqr(r2,zr,pr);
+			mpn_sqr(i2,zi,pr);
 			unsigned k=mxi;
 			do{
 				iis=zrs^zis;
 				mpn_mul_n(ii,zr,zi,pr);
 				mpn_lshift(ii+pr,ii+pr,pr,5);
-				mpn_sqr(i2,zi,pr);
 				mymp_add(zi,ii+pr,ci,pr,iis,cis,&zis);
-				mpn_sqr(ii,zr,pr);
-				mymp_add(zr,ii+pr,i2+pr,pr,0,1,&zrs);
+				mymp_add(zr,r2+pr,i2+pr,pr,0,1,&zrs);
 				mpn_lshift(zr,zr,pr,4);
 				mymp_add(zr,zr,cr,pr,zrs,crs,&zrs);
-				mpn_sqr(ii,zr,pr);
+				mpn_sqr(r2,zr,pr);
 				mpn_sqr(i2,zi,pr);
-			}while(--k&&ii[pr*2-1]+i2[pr*2-1]<(1ULL<<mp_bits_per_limb-6));
+			}while(--k&&r2[pr*2-1]+i2[pr*2-1]<(1ULL<<mp_bits_per_limb-6));
 			manor[c][j]=(k<<8)/mxi;
 		}
 	}

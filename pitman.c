@@ -7,7 +7,7 @@
 #include <string.h>
 #define THREADS 4
 volatile _Bool pull;
-long double xx=-2,yy=-2,wh=4/512.;
+long double xx=-2,yy=-2,wh=1/128.;
 unsigned char manor[512][512];
 unsigned long long done[8];
 unsigned mxi=300;
