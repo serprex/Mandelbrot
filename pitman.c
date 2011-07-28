@@ -2,7 +2,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <GL/glx.h>
-#include <math.h>
 #include <complex.h>
 #include <string.h>
 #define THREADS 4
