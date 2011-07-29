@@ -27,9 +27,9 @@ int main(int argc,char**argv){
 		return 1;
 	}
 	clUnloadCompiler();
-	cl_mem px=CL_CHECK_ERR(clCreateBuffer(cx,CL_MEM_WRITE_ONLY,sizeof(int)*128,0,&_err));
 	cl_kernel k=CL_CHECK_ERR(clCreateKernel(pg,"m",&_err));
 	cl_command_queue q=CL_CHECK_ERR(clCreateCommandQueue(cx,dv,0,&_err));
+	cl_mem px=CL_CHECK_ERR(clCreateBuffer(cx,CL_MEM_WRITE_ONLY,sizeof(int)*128,0,&_err));
 	clSetKernelArg(k,0,sizeof(cl_mem),&px);
 	int nx,ny;
 	unsigned char C[256][3];
