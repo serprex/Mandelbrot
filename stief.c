@@ -11,8 +11,7 @@ void printLog(GLuint obj)
 }
 int main(int argc,char**argv){
 	float xx=-2,yy=-2,wh=1/128.;
-	unsigned mxi=300;
-	int nx,ny;
+	int nx,ny,mxi=300;
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
 	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=ExposureMask|ButtonPressMask|ButtonReleaseMask}});
@@ -38,12 +37,7 @@ int main(int argc,char**argv){
 		xne:XNextEvent(dpy,&ev);
 		switch(ev.type){
 		case Expose:
-			glBegin(GL_QUADS);
-			glVertex2i(ev.xexpose.x,ev.xexpose.y);
-			glVertex2i(ev.xexpose.x+ev.xexpose.width,ev.xexpose.y);
-			glVertex2i(ev.xexpose.x+ev.xexpose.width,ev.xexpose.y+ev.xexpose.height);
-			glVertex2i(ev.xexpose.x,ev.xexpose.y+ev.xexpose.height);
-			glEnd();
+			glRecti(ev.xexpose.x,ev.xexpose.y,ev.xexpose.width,ev.xexpose.height);
 			glFlush();
 		break;case ButtonPress:
 			switch(ev.xbutton.button){
@@ -85,12 +79,7 @@ int main(int argc,char**argv){
 				}
 				rend:printf("%u\n%f\n%f\n%f\n\n",mxi,xx,yy,wh);
 				glUniform3fARB(xy,xx,yy,wh);
-				glBegin(GL_QUADS);
-				glVertex2i(0,0);
-				glVertex2i(512,0);
-				glVertex2i(512,512);
-				glVertex2i(0,512);
-				glEnd();
+				glRecti(0,0,512,512);
 				glFlush();
 			}else if(ev.xbutton.button==Button3){
 				nx-=ev.xbutton.x;

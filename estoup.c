@@ -5,8 +5,7 @@ int main(int argc,char**argv){
 	const size_t gws=128;
 	float xx=-2,yy=-2,wh=1/128.;
 	unsigned char manor[512][512];
-	unsigned mxi=300;
-	int nx,ny,mans;
+	int nx,ny,mans,mxi=300;
 	unsigned char C[256][3];
 	for(int i=0;i<256;i++){
 		C[i][0]=i*i*i>>16;
