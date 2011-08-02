@@ -1,14 +1,6 @@
 #include <stdio.h>
 #include <GL/glew.h>
 #include <GL/glx.h>
-void printLog(GLuint obj)
-{
-	int len;
-	glGetShaderiv(obj,GL_INFO_LOG_LENGTH,&len);
-	char info[len];
-	glGetShaderInfoLog(obj,len,&len,info);
-	if(len)printf("%s\n",info);
-}
 int main(int argc,char**argv){
 	float xx=-2,yy=-2,wh=1/128.;
 	int nx,ny,mxi=300,r=1;
@@ -23,11 +15,9 @@ int main(int argc,char**argv){
 	GLuint fs=glCreateShader(GL_FRAGMENT_SHADER);
 	glShaderSource(fs,1,&S,0);
 	glCompileShader(fs);
-	printLog(fs);
 	GLuint sp=glCreateProgram();
 	glAttachShader(sp,fs);
 	glLinkProgram(sp);
-	printLog(sp);
 	glUseProgram(sp);
 	GLint xy=glGetUniformLocationARB(sp,"p"),mloc=glGetUniformLocationARB(sp,"m");
 	glUniform1iARB(mloc,mxi);
