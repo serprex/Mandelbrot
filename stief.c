@@ -6,21 +6,13 @@ void printLog(GLuint obj)
 	int len;
 	glGetShaderiv(obj,GL_INFO_LOG_LENGTH,&len);
 	char info[len];
-	glGetShaderInfoLog(obj, len, &len, info);
-	if(len)
-		printf("%s\n",info);
+	glGetShaderInfoLog(obj,len,&len,info);
+	if(len)printf("%s\n",info);
 }
 int main(int argc,char**argv){
 	float xx=-2,yy=-2,wh=1/128.;
-	unsigned char manor[512][512];
 	unsigned mxi=300;
 	int nx,ny;
-	unsigned char C[256][3];
-	for(int i=0;i<256;i++){
-		C[i][0]=i*i*i>>16;
-		C[i][1]=i*i>>8;
-		C[i][2]=i;
-	}
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
 	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=ExposureMask|ButtonPressMask|ButtonReleaseMask}});
@@ -30,11 +22,11 @@ int main(int argc,char**argv){
 	glewInit();
 	const char*S="#version 120\nuniform vec3 p;uniform int m;void main(void){vec2 z=p.xy+vec2(gl_FragCoord.x*p[2],(512-gl_FragCoord.y)*p[2]),a=z*z,c=z;for(int i=m-1;i>-1;i--){z=vec2(a.x-a.y,z.x*z.y*2)+c;a=z*z;if(a.x+a.y>4){float I=float(i)/m;gl_FragColor.xyz=vec3(I*I*I,I*I,I);break;}}}";
 	GLuint fs=glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fs, 1, &S, 0);
+	glShaderSource(fs,1,&S,0);
 	glCompileShader(fs);
 	printLog(fs);
-	GLuint sp = glCreateProgram();
-	glAttachShader(sp, fs);
+	GLuint sp=glCreateProgram();
+	glAttachShader(sp,fs);
 	glLinkProgram(sp);
 	printLog(sp);
 	glUseProgram(sp);
