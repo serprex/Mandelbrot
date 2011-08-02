@@ -11,7 +11,7 @@ void printLog(GLuint obj)
 }
 int main(int argc,char**argv){
 	float xx=-2,yy=-2,wh=1/128.;
-	int nx,ny,mxi=300;
+	int nx,ny,mxi=300,r=1;
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
 	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=ExposureMask|ButtonPressMask|ButtonReleaseMask}});
@@ -31,8 +31,14 @@ int main(int argc,char**argv){
 	glUseProgram(sp);
 	GLint xy=glGetUniformLocationARB(sp,"p"),mloc=glGetUniformLocationARB(sp,"m");
 	glUniform1iARB(mloc,mxi);
-	goto rend;
 	for(;;){
+		if(!XPending(dpy)&&r){
+			rend:r=0;
+			printf("%u\n%f\n%f\n%f\n\n",mxi,xx,yy,wh);
+			glUniform3fARB(xy,xx,yy,wh);
+			glRecti(0,0,512,512);
+			glFinish();
+		}
 		XEvent ev;
 		xne:XNextEvent(dpy,&ev);
 		switch(ev.type){
@@ -41,8 +47,8 @@ int main(int argc,char**argv){
 			glFlush();
 		break;case ButtonPress:
 			switch(ev.xbutton.button){
-			default:goto rend;
-			case Button1:
+			default:r=1;
+			break;case Button1:
 				if((unsigned)ev.xbutton.x>=512||(unsigned)ev.xbutton.y>=512)break;
 				case Button3:
 				nx=ev.xbutton.x;
@@ -77,10 +83,7 @@ int main(int argc,char**argv){
 						wh*=(nx-(nx-ny&nx-ny>>31))/512.;
 					}
 				}
-				rend:printf("%u\n%f\n%f\n%f\n\n",mxi,xx,yy,wh);
-				glUniform3fARB(xy,xx,yy,wh);
-				glRecti(0,0,512,512);
-				glFlush();
+				r=1;
 			}else if(ev.xbutton.button==Button3){
 				nx-=ev.xbutton.x;
 				ny-=ev.xbutton.y;
