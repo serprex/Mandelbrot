@@ -5,7 +5,7 @@ int main(int argc,char**argv){
 	const size_t gws=128;
 	float xx=-2,yy=-2,wh=1/128.;
 	unsigned char manor[512][512];
-	int nx,ny,mans,mxi=300;
+	int nx,ny,mans,mx=300;
 	unsigned char C[256][3];
 	for(int i=0;i<256;i++){
 		C[i][0]=i*i*i>>16;
@@ -33,7 +33,7 @@ int main(int argc,char**argv){
 	cl_command_queue q=clCreateCommandQueue(cx,dv,0,0);
 	cl_mem px=clCreateBuffer(cx,CL_MEM_WRITE_ONLY,512,0,0);
 	clSetKernelArg(k,0,sizeof(cl_mem),&px);
-	clSetKernelArg(k,4,4,&mxi);
+	clSetKernelArg(k,4,4,&mx);
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,None});
 	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,511,511,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=ExposureMask|ButtonPressMask|ButtonReleaseMask}});
@@ -57,18 +57,15 @@ int main(int argc,char**argv){
 				glFlush();
 			break;case ButtonPress:
 				switch(ev.xbutton.button){
-				default:goto rend;
-				case Button1:
-					if((unsigned)ev.xbutton.x>=512||(unsigned)ev.xbutton.y>=512)break;
-					case Button3:
+				case Button1:case Button3:
 					nx=ev.xbutton.x;
 					ny=ev.xbutton.y;
 				break;case Button4:case Button5:
-					mxi+=ev.xbutton.button==Button4?25:mxi>25?-25:0;
-					clSetKernelArg(k,4,4,&mxi);
+					mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
+					clSetKernelArg(k,4,4,&mx);
 				}
 			break;case ButtonRelease:
-				if(ev.xbutton.button==Button1&&(unsigned)ev.xbutton.x<512&&(unsigned)ev.xbutton.y<512){
+				if(ev.xbutton.button==Button1){
 					if(ev.xbutton.x==nx&&ev.xbutton.y==ny){
 						xx+=(ev.xbutton.x-512)*wh;
 						yy+=(ev.xbutton.y-512)*wh;
@@ -93,7 +90,7 @@ int main(int argc,char**argv){
 							wh*=(nx-(nx-ny&nx-ny>>31))/512.;
 						}
 					}
-					rend:printf("%u\n%f\n%f\n%f\n\n",mxi,xx,yy,wh);
+					rend:printf("%u\n%f\n%f\n%f\n\n",mx,xx,yy,wh);
 					mans=0;
 					clSetKernelArg(k,1,4,&xx);
 					clSetKernelArg(k,2,4,&yy);
