@@ -139,14 +139,14 @@ int main(int argc,char**argv){
 						}
 						from3:;
 						mp_limb_t t[pr];
-						if(xs!=(nx>0)){
+						if(xs!=(nx<0)){
 							mpn_mul_1(t,wh,pr,abs(nx));
 							if(mpn_cmp(xx,t,pr)<0){
 								xs=!xs;
 								mpn_sub_n(xx,t,xx,pr);
 							}else mpn_sub_n(xx,xx,t,pr);
 						}else mpn_addmul_1(xx,wh,pr,abs(nx));
-						if(ys!=(ny>0)){
+						if(ys!=(ny<0)){
 							mpn_mul_1(t,wh,pr,abs(ny));
 							if(mpn_cmp(yy,t,pr)<0){
 								ys=!ys;
