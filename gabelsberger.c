@@ -24,13 +24,10 @@ static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_s
 	}else mpn_sub_n(r,a,b,n);
 }
 void*drawman(void*x){
-	int c=-1;
-	for(;;){
-		pthread_mutex_lock(&xcol);
-		if(c!=-1)done[c>>6]|=1ULL<<(c&63);
-		c=col++;
-		pthread_mutex_unlock(&xcol);
-		if(c>=512||pull)return 0;
+	pthread_mutex_lock(&xcol);
+	int c=col++;
+	pthread_mutex_unlock(&xcol);
+	do{
 		mp_limb_t cr[pr],ci[pr],zr[pr],zi[pr],ii[pr*2],i2[pr*2],r2[pr*2];
 		_Bool zrs,zis,crs,cis=ys,iis;
 		mpn_mul_1(cr,wh,pr,c);
@@ -58,7 +55,11 @@ void*drawman(void*x){
 			}while(--k&&r2[pr*2-1]+i2[pr*2-1]<(1ULL<<mp_bits_per_limb-6));
 			manor[c][j]=(k<<8)/mx;
 		}
-	}
+		pthread_mutex_lock(&xcol);
+		done[c>>6]|=1ULL<<(c&63);
+		c=col++;
+		pthread_mutex_unlock(&xcol);
+	}while(c<512&&!pull);
 }
 int main(int argc,char**argv){
 	int nx,ny,mans=0;
@@ -171,8 +172,7 @@ int main(int argc,char**argv){
 					rend:gmp_printf("%u %u\n%Nx\n%Nx\n%Nx\n",pr,mx,xx,pr,yy,pr,wh,pr);
 					for(int i=0;i<THREADS;i++)
 						pthread_join(a[i],0);
-					pull=0;
-					mans=col=0;
+					pull=mans=col=0;
 					memset(done,0,sizeof(done));
 					fend:for(int i=0;i<THREADS;i++)
 						pthread_create(a+i,&pat,drawman,0);
@@ -186,7 +186,7 @@ int main(int argc,char**argv){
 		}
 		if(mans!=512){
 			pthread_mutex_lock(&xcol);
-			for(int i=mans>>6;i>=0;i--)
+			for(int m64=mans>>6,i=m64;i>=m64-1;i--)
 				if(done[i]){
 					int lo=ffsll(done[i])-1;
 					if(done[i]&1ULL<<lo){

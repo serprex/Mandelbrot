@@ -13,20 +13,21 @@ unsigned mx=300;
 pthread_mutex_t xcol;
 int col;
 void*drawman(void*x){
-	int c=-1;
-	for(;;){
-		pthread_mutex_lock(&xcol);
-		if(c!=-1)done[c>>6]|=1ULL<<(c&63);
-		c=col++;
-		pthread_mutex_unlock(&xcol);
-		if(c>=512||pull)return 0;
+	pthread_mutex_lock(&xcol);
+	int c=col++;
+	pthread_mutex_unlock(&xcol);
+	do{
 		for(int j=0;j<512;j++){
 			complex long double z=xx+wh*c+I*(yy+wh*j),y=z;
 			unsigned k=mx;
 			while(--k&&cabsl(z=z*z+y)<2);
 			manor[c][j]=(k<<8)/mx;
 		}
-	}
+		pthread_mutex_lock(&xcol);
+		done[c>>6]|=1ULL<<(c&63);
+		c=col++;
+		pthread_mutex_unlock(&xcol);
+	}while(c<512&&!pull);
 }
 int main(int argc,char**argv){
 	int nx,ny,mans=0;
@@ -99,8 +100,7 @@ int main(int argc,char**argv){
 					rend:printf("%u\n%Lf\n%Lf\n%Lf\n\n",mx,xx,yy,wh);
 					for(int i=0;i<THREADS;i++)
 						pthread_join(a[i],0);
-					pull=0;
-					mans=col=0;
+					pull=mans=col=0;
 					memset(done,0,sizeof(done));
 					fend:for(int i=0;i<THREADS;i++)
 						pthread_create(a+i,&pat,drawman,0);
@@ -114,7 +114,7 @@ int main(int argc,char**argv){
 		}
 		if(mans!=512){
 			pthread_mutex_lock(&xcol);
-			for(int i=mans>>6;i>=0;i--)
+			for(int m64=mans>>6,i=m64;i>=m64-1;i--)
 				if(done[i]){
 					int lo=ffsll(done[i])-1;
 					if(done[i]&1ULL<<lo){
