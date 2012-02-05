@@ -43,7 +43,7 @@ int main(int argc,char**argv){
 	goto rend;
 	for(;;){
 		XEvent ev;
-		if(XPending(dpy)||mans==512){
+		if(XPending(dpy)){
 			xne:XNextEvent(dpy,&ev);
 			switch(ev.type){
 			case Expose:
@@ -112,8 +112,10 @@ int main(int argc,char**argv){
 				glVertex2i(mans,j);
 			}
 			glEnd();
-			if(++mans==512)glFlush();
-			else{
+			if(++mans==512){
+				glFlush();
+				goto xne;
+			}else{
 				float x=xx+mans*wh;
 				clSetKernelArg(k,1,4,&x);
 				clEnqueueNDRangeKernel(q,k,1,0,&gws,0,0,0,0);

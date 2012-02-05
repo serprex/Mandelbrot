@@ -9,9 +9,8 @@ volatile _Bool pull;
 long double xx=-2,yy=-2,wh=1/128.;
 unsigned char manor[512][512];
 unsigned long long done[8];
-unsigned mx=300;
+unsigned mx=300,col;
 pthread_mutex_t xcol;
-int col;
 void*drawman(void*x){
 	pthread_mutex_lock(&xcol);
 	int c=col++;
@@ -51,7 +50,7 @@ int main(int argc,char**argv){
 	goto fend;
 	for(;;){
 		XEvent ev;
-		ever:if(XPending(dpy)||mans==512){
+		ever:if(XPending(dpy)){
 			xne:XNextEvent(dpy,&ev);
 			switch(ev.type){
 			case Expose:

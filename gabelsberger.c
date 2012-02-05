@@ -11,10 +11,9 @@ _Bool xs=1,ys=1;
 volatile _Bool pull;
 unsigned char manor[512][512];
 unsigned long long done[8];
-unsigned mx=300;
+unsigned mx=300,col;
 mp_size_t pr=1;
 pthread_mutex_t xcol;
-int col;
 static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*rs){
 	*rs=as;
 	if(as==bs)mpn_add_n(r,a,b,n);
@@ -86,7 +85,7 @@ int main(int argc,char**argv){
 	goto fend;
 	for(;;){
 		XEvent ev;
-		ever:if(XPending(dpy)||mans==512){
+		ever:if(XPending(dpy)){
 			xne:XNextEvent(dpy,&ev);
 			switch(ev.type){
 			case Expose:

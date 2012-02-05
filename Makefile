@@ -1,6 +1,6 @@
 all: pitman gabelsberger estoup stief
 pitman: pitman.c
-	gcc -g -std=gnu1x -fwhole-program -O3 -ffast-math -lGL -lX11 -pthread -march=native pitman.c -o pitman
+	gcc -s -std=gnu1x -fwhole-program -O3 -ffast-math -lGL -lX11 -pthread -march=native pitman.c -o pitman
 gabelsberger: gabelsberger.c
 	gcc -s -std=gnu1x -fwhole-program -O3 -ffast-math -lGL -lX11 -lgmp -pthread -march=native gabelsberger.c -o gabelsberger
 estoup: estoup.c

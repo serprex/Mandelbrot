@@ -31,7 +31,7 @@ int main(int argc,char**argv){
 			glFinish();
 		}
 		XEvent ev;
-		xne:XNextEvent(dpy,&ev);
+		XNextEvent(dpy,&ev);
 		switch(ev.type){
 		case Expose:r=1;
 		break;case ButtonPress:
