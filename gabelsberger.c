@@ -14,7 +14,7 @@ unsigned long long done[8];
 unsigned mx=300,col;
 mp_size_t pr=1;
 pthread_mutex_t xcol;
-static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*rs){
+static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*restrict rs){
 	*rs=as;
 	if(as==bs)mpn_add_n(r,a,b,n);
 	else if(mpn_cmp(a,b,n)<0){
@@ -27,8 +27,8 @@ void*drawman(void*x){
 	int c=col++;
 	pthread_mutex_unlock(&xcol);
 	do{
-		mp_limb_t cr[pr],ci[pr],zr[pr],zi[pr],ii[pr*2],i2[pr*2],r2[pr*2];
-		_Bool zrs,zis,crs,cis=ys,iis;
+		mp_limb_t cr[pr],ci[pr],zr[pr],zi[pr*2],i2[pr*2],r2[pr*2];
+		_Bool zrs,zis,crs,cis=ys;
 		mpn_mul_1(cr,wh,pr,c);
 		mymp_add(cr,cr,xx,pr,0,xs,&crs);
 		mpn_copyi(ci,yy,pr);
@@ -42,10 +42,9 @@ void*drawman(void*x){
 			mpn_sqr(i2,zi,pr);
 			unsigned k=mx;
 			do{
-				iis=zrs^zis;
-				mpn_mul_n(ii,zr,zi,pr);
-				mpn_lshift(ii+pr,ii+pr,pr,5);
-				mymp_add(zi,ii+pr,ci,pr,iis,cis,&zis);
+				mpn_mul_n(zi,zi,zr,pr);
+				mpn_lshift(zi+pr,zi+pr,pr,5);
+				mymp_add(zi,zi+pr,ci,pr,zrs^zis,cis,&zis);
 				mymp_add(zr,r2+pr,i2+pr,pr,0,1,&zrs);
 				mpn_lshift(zr,zr,pr,4);
 				mymp_add(zr,zr,cr,pr,zrs,crs,&zrs);
