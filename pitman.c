@@ -116,24 +116,22 @@ int main(int argc,char**argv){
 			for(int m64=mans>>6,i=m64;i>=m64-1;i--)
 				if(done[i]){
 					int lo=ffsll(done[i])-1;
-					if(done[i]&1ULL<<lo){
-						done[i]^=1ULL<<lo;
-						pthread_mutex_unlock(&xcol);
-						int io=i*64+lo;
-						glBegin(GL_POINTS);
-						for(int j=0;j<512;j++){
-							glColor3ubv(C[manor[io][j]]);
-							glVertex2i(io,j);
-						}
-						glEnd();
-						if(++mans==512){
-							for(int i=0;i<THREADS;i++)
-								pthread_join(a[i],0);
-							glFlush();
-							goto xne;
-						}
-						goto ever;
+					done[i]^=1ULL<<lo;
+					pthread_mutex_unlock(&xcol);
+					int io=i*64+lo;
+					glBegin(GL_POINTS);
+					for(int j=0;j<512;j++){
+						glColor3ubv(C[manor[io][j]]);
+						glVertex2i(io,j);
 					}
+					glEnd();
+					if(++mans==512){
+						for(int i=0;i<THREADS;i++)
+							pthread_join(a[i],0);
+						glFlush();
+						goto xne;
+					}
+					goto ever;
 				}
 			pthread_mutex_unlock(&xcol);
 		}
