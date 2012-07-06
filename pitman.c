@@ -17,9 +17,13 @@ void*drawman(void*x){
 	pthread_mutex_unlock(&xcol);
 	do{
 		for(int j=0;j<512;j++){
-			complex long double z=xx+wh*c+I*(yy+wh*j),y=z;
+			long double zr=xx+wh*c,zi=yy+wh*j,cr=zr,ci=zi,r2=zr*zr,i2=zi*zi;
 			unsigned k=mx;
-			while(--k&&cabsl(z=z*z+y)<2);
+			while(--k){
+				zi=zi*zr*2+ci;
+				zr=r2-i2+cr;
+				if((r2=zr*zr)+(i2=zi*zi)>4)break;
+			}
 			manor[c][j]=(k<<8)/mx;
 		}
 		pthread_mutex_lock(&xcol);
