@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <pthread.h>
 #include <stdio.h>
 #include <GL/glx.h>
@@ -135,7 +134,7 @@ int main(int argc,char**argv){
 			pthread_mutex_lock(&xcol);
 			for(int m64=mans>>6,i=m64;i>=m64-1;i--)
 				if(done[i]){
-					int lo=ffsll(done[i])-1;
+					int lo=__builtin_ctzll(done[i]);
 					done[i]^=1ULL<<lo;
 					pthread_mutex_unlock(&xcol);
 					int io=i*64+lo;
