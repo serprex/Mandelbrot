@@ -1,7 +1,6 @@
 all: pitman taylor gabelsberger estoup stief
 pitman: pitman.c
 	gcc -s -std=gnu1x -fwhole-program -O3 -ffast-math -lGL -lX11 -pthread -march=native pitman.c -o pitman
-	gcc -s -std=gnu1x -fwhole-program -O3 -ffast-math -lGL -lX11 -pthread -march=native pitman.c -S -masm=intel
 taylor: taylor.c
 	gcc -s -std=gnu1x -fwhole-program -O3 -ffast-math -lGL -lX11 -pthread -march=native taylor.c -o taylor
 gabelsberger: gabelsberger.c
