@@ -21,10 +21,10 @@ void*drawman(void*x){
 			__m128d zr=cr,
 				zi=_mm_set_pd(yy+wh*j,yy+wh*(j+1)),ci=zi,
 				zr2=_mm_mul_pd(zr,zr),zi2=_mm_mul_pd(zi,zi);
-			uint64_t kkini[2]__attribute__((aligned(16)))={mx-1,mx-1};
+			unsigned mk=mx-1;
+			uint64_t kkini[2]__attribute__((aligned(16)))={mk,mk};
 			__m128i k=_mm_load_si128((__m128i*)kkini);
-			unsigned mk=mx;
-			while(--mk){
+			do{
 				zi=_mm_mul_pd(zi,zr);
 				zi=_mm_add_pd(_mm_add_pd(zi,zi),ci);
 				zr=_mm_add_pd(_mm_sub_pd(zr2,zi2),cr);
@@ -33,7 +33,7 @@ void*drawman(void*x){
 				__m128d n=_mm_cmplt_pd(_mm_add_pd(zr2,zi2),_mm_set1_pd(4));
 				if(!_mm_movemask_pd(n))break;
 				k=_mm_add_epi64(k,_mm_castpd_si128(n));
-			}
+			}while(--mk);
 			uint64_t kk[2]__attribute__((aligned(16)));
 			_mm_store_si128((__m128i*)kk,k);
 			manor[c][j]=kk[1]*mxx>>16;

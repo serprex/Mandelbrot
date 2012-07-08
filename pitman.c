@@ -17,12 +17,12 @@ void*drawman(void*x){
 	do{
 		for(int j=0;j<512;j++){
 			long double zr=xx+wh*c,zi=yy+wh*j,cr=zr,ci=zi,r2=zr*zr,i2=zi*zi;
-			unsigned k=mx;
-			while(--k){
+			unsigned k=mx-1;
+			do{
 				zi=zi*zr*2+ci;
 				zr=r2-i2+cr;
 				if((r2=zr*zr)+(i2=zi*zi)>4)break;
-			}
+			}while(--k);
 			manor[c][j]=k*mxx>>16;
 		}
 		pthread_mutex_lock(&xcol);
