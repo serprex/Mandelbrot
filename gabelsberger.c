@@ -3,14 +3,15 @@
 #include <GL/glx.h>
 #include <stdlib.h>
 #include <gmp.h>
+#include <stdint.h>
 #include <string.h>
 #define THREADS 4
 mp_limb_t*xx,*yy,*wh;
 _Bool xs=1,ys=1;
 volatile _Bool pull;
 unsigned char manor[512][512];
-unsigned long long done[8];
-unsigned mx=300,col;
+uint64_t done[8];
+unsigned mx=300,mxx=16777216/300,col;
 mp_size_t pr=1;
 pthread_mutex_t xcol;
 static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*restrict rs){
@@ -50,7 +51,7 @@ void*drawman(void*x){
 				mpn_sqr(r2,zr,pr);
 				mpn_sqr(i2,zi,pr);
 			}while(--k&&r2[pr*2-1]+i2[pr*2-1]<(1ULL<<mp_bits_per_limb-6));
-			manor[c][j]=(k<<8)/mx;
+			manor[c][j]=k*mxx>>16;
 		}
 		pthread_mutex_lock(&xcol);
 		done[c>>6]|=1ULL<<(c&63);
@@ -100,7 +101,9 @@ int main(int argc,char**argv){
 				case Button1:case Button3:
 					nx=ev.xbutton.x;
 					ny=ev.xbutton.y;
-				break;case Button4:case Button5:mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
+				break;case Button4:case Button5:
+					mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
+					mxx=16777216/mx;
 				}
 			break;case ButtonRelease:
 				if(ev.xbutton.button==Button1){

@@ -1,7 +1,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <GL/glx.h>
-#include <complex.h>
 #include <string.h>
 #include <stdint.h>
 #include <xmmintrin.h>
@@ -9,8 +8,8 @@
 volatile _Bool pull;
 double xx=-2,yy=-2,wh=1/128.;
 unsigned char manor[512][512];
-unsigned long long done[8];
-unsigned mx=300,col;
+uint64_t done[8];
+unsigned mx=300,mxx=16777216/300,col;
 pthread_mutex_t xcol;
 void*drawman(void*x){
 	pthread_mutex_lock(&xcol);
@@ -36,9 +35,9 @@ void*drawman(void*x){
 				k=_mm_add_epi64(k,_mm_castpd_si128(n));
 			}
 			uint64_t kk[2]__attribute__((aligned(16)));
-			_mm_store_si128((__m128i*)kk,_mm_slli_epi64(k,8));
-			manor[c][j]=kk[1]/mx;
-			manor[c][j+1]=kk[0]/mx;
+			_mm_store_si128((__m128i*)kk,k);
+			manor[c][j]=kk[1]*mxx>>16;
+			manor[c][j+1]=kk[0]*mxx>>16;
 		}
 		pthread_mutex_lock(&xcol);
 		done[c>>6]|=1ULL<<(c&63);
@@ -85,7 +84,9 @@ int main(int argc,char**argv){
 				case Button1:case Button3:
 					nx=ev.xbutton.x;
 					ny=ev.xbutton.y;
-				break;case Button4:case Button5:mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
+				break;case Button4:case Button5:
+					mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
+					mxx=16777216/mx;
 				}
 			break;case ButtonRelease:
 				if(ev.xbutton.button==Button1){

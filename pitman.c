@@ -1,14 +1,14 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <GL/glx.h>
-#include <complex.h>
+#include <stdint.h>
 #include <string.h>
 #define THREADS 4
 volatile _Bool pull;
 long double xx=-2,yy=-2,wh=1/128.;
 unsigned char manor[512][512];
-unsigned long long done[8];
-unsigned mx=300,col;
+uint64_t done[8];
+unsigned mx=300,mxx=16777216/300,col;
 pthread_mutex_t xcol;
 void*drawman(void*x){
 	pthread_mutex_lock(&xcol);
@@ -23,7 +23,7 @@ void*drawman(void*x){
 				zr=r2-i2+cr;
 				if((r2=zr*zr)+(i2=zi*zi)>4)break;
 			}
-			manor[c][j]=(k<<8)/mx;
+			manor[c][j]=k*mxx>>16;
 		}
 		pthread_mutex_lock(&xcol);
 		done[c>>6]|=1ULL<<(c&63);
@@ -70,7 +70,9 @@ int main(int argc,char**argv){
 				case Button1:case Button3:
 					nx=ev.xbutton.x;
 					ny=ev.xbutton.y;
-				break;case Button4:case Button5:mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
+				break;case Button4:case Button5:
+					mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
+					mxx=16777216/mx;
 				}
 			break;case ButtonRelease:
 				if(ev.xbutton.button==Button1){
