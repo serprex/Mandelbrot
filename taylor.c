@@ -27,8 +27,7 @@ void*drawman(void*x){
 			unsigned mk=mx;
 			while(--mk){
 				zi=_mm_mul_pd(zi,zr);
-				zi=_mm_add_pd(zi,zi);
-				zi=_mm_add_pd(zi,ci);
+				zi=_mm_add_pd(_mm_add_pd(zi,zi),ci);
 				zr=_mm_add_pd(_mm_sub_pd(zr2,zi2),cr);
 				zr2=_mm_mul_pd(zr,zr);
 				zi2=_mm_mul_pd(zi,zi);
