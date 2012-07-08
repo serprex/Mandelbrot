@@ -37,9 +37,9 @@ void*drawman(void*x){
 				k=_mm_add_epi64(k,_mm_castpd_si128(n));
 			}
 			uint64_t kk[2]__attribute__((aligned(16)));
-			_mm_store_si128((__m128i*)kk,k);
-			manor[c][j]=(kk[1]<<8)/mx;
-			manor[c][j+1]=(kk[0]<<8)/mx;
+			_mm_store_si128((__m128i*)kk,_mm_slli_epi64(k,8));
+			manor[c][j]=kk[1]/mx;
+			manor[c][j+1]=kk[0]/mx;
 		}
 		pthread_mutex_lock(&xcol);
 		done[c>>6]|=1ULL<<(c&63);
