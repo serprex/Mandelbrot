@@ -1,0 +1,15 @@
+cc=gcc
+cf=-s -std=gnu11 -fwhole-program -Ofast -ffast-math -lGL -lX11 -pthread -march=native -pipe
+rule cc
+ command = $cc $in $cf $cf2 -o $out
+build pitman: cc pitman.c
+build taylor: cc taylor.c
+build gabelsberger: cc gabelsberger.c
+ cf2=-lgmp
+build estoup: cc estoup.c
+ cf2=-lOpenCL
+build stief: cc stief.c
+ cf2=-lGLEW
+default pitman
+default taylor
+default gabelsberger
