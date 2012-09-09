@@ -10,6 +10,4 @@ build estoup: cc estoup.c
  cf2=-lOpenCL
 build stief: cc stief.c
  cf2=-lGLEW
-default pitman
-default taylor
-default gabelsberger
+default pitman taylor gabelsberger
