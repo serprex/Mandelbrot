@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <GL/glx.h>
 #include <stdlib.h>
@@ -10,10 +11,10 @@ mp_limb_t*xx,*yy,*wh;
 _Bool xs=1,ys=1;
 volatile _Bool pull;
 unsigned char manor[512][512];
-uint64_t done[8];
-unsigned mx=300,mxx=16777216/300,col;
+_Atomic uint64_t done[8];
+unsigned mx=300,mxx=16777216/300;
+_Atomic unsigned col;
 mp_size_t pr=1;
-pthread_mutex_t xcol;
 static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*restrict rs){
 	*rs=as;
 	if(as==bs)mpn_add_n(r,a,b,n);
@@ -23,9 +24,7 @@ static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_s
 	}else mpn_sub_n(r,a,b,n);
 }
 void*drawman(void*x){
-	pthread_mutex_lock(&xcol);
 	int c=col++;
-	pthread_mutex_unlock(&xcol);
 	do{
 		mp_limb_t cr[pr],ci[pr],zr[pr],zi[pr*2],i2[pr*2],r2[pr*2];
 		_Bool zrs,zis,crs,cis=ys;
@@ -53,10 +52,8 @@ void*drawman(void*x){
 			}while(--k&&r2[pr*2-1]+i2[pr*2-1]<(1ULL<<mp_bits_per_limb-6));
 			manor[c][j]=k*mxx>>16;
 		}
-		pthread_mutex_lock(&xcol);
 		done[c>>6]|=1ULL<<(c&63);
 		c=col++;
-		pthread_mutex_unlock(&xcol);
 	}while(c<512&&!pull);
 }
 int main(int argc,char**argv){
@@ -77,7 +74,6 @@ int main(int argc,char**argv){
 	XMapWindow(dpy,win);
 	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	glOrtho(0,511,511,0,1,-1);
-	pthread_mutex_init(&xcol,0);
 	pthread_attr_t pat;
 	pthread_attr_init(&pat);
 	pthread_attr_setguardsize(&pat,0);
@@ -185,12 +181,10 @@ int main(int argc,char**argv){
 			}
 		}
 		if(mans!=512){
-			pthread_mutex_lock(&xcol);
 			for(int m64=mans>>6,i=m64;i>=m64-1;i--)
 				if(done[i]){
 					int lo=__builtin_ctzll(done[i]);
 					done[i]^=1ULL<<lo;
-					pthread_mutex_unlock(&xcol);
 					int io=i*64+lo;
 					glBegin(GL_POINTS);
 					for(int j=0;j<512;j++){
@@ -198,15 +192,14 @@ int main(int argc,char**argv){
 						glVertex2i(io,j);
 					}
 					glEnd();
+					glFlush();
 					if(++mans==512){
 						for(int i=0;i<THREADS;i++)
 							pthread_join(a[i],0);
-						glFlush();
 						goto xne;
 					}
 					goto ever;
 				}
-			pthread_mutex_unlock(&xcol);
 		}
 	}
 }
