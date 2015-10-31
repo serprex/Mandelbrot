@@ -10,15 +10,17 @@ volatile _Bool pull;
 double xx=-2,yy=-2,wh=1/128.;
 unsigned char manor[512][512];
 _Atomic uint64_t done[8];
-unsigned mx=300,mxx=16777216/300;
+unsigned mx=300;
 _Atomic unsigned col;
 void*drawman(void*x){
 	int c=col++;
+	unsigned _m=mx,mxx=16777216/_m;
+	double _x=xx,_y=yy,_w=wh;
 	do{
-		__m128d cr=_mm_set1_pd(xx+wh*c);
+		__m128d cr=_mm_set1_pd(_x+_w*c);
 		for(int j=0;j<512;j+=2){
 			__m128d zr=cr,
-				zi=_mm_set_pd(yy+wh*j,yy+wh*(j+1)),ci=zi,
+				zi=_mm_set_pd(_y+_w*j,_y+_w*(j+1)),ci=zi,
 				zr2=_mm_mul_pd(zr,zr),zi2=_mm_mul_pd(zi,zi);
 			unsigned mk=mx-1;
 			uint64_t kk[2]__attribute__((aligned(16)))={mk,mk};
@@ -81,7 +83,6 @@ int main(int argc,char**argv){
 					ny=ev.xbutton.y;
 				break;case Button4:case Button5:
 					mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
-					mxx=16777216/mx;
 				}
 			break;case ButtonRelease:
 				if(ev.xbutton.button==Button1){

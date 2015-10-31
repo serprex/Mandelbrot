@@ -12,7 +12,7 @@ _Bool xs=1,ys=1;
 volatile _Bool pull;
 unsigned char manor[512][512];
 _Atomic uint64_t done[8];
-unsigned mx=300,mxx=16777216/300;
+unsigned mx=300;
 _Atomic unsigned col;
 mp_size_t pr=1;
 static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_size_t n,_Bool as,_Bool bs,_Bool*restrict rs){
@@ -25,11 +25,13 @@ static inline void mymp_add(mp_limb_t*r,const mp_limb_t*a,const mp_limb_t*b,mp_s
 }
 void*drawman(void*x){
 	int c=col++;
+	unsigned _m=mx,mxx=16777216/_m;
+	_Bool _ys=ys,_xs=xs;
 	do{
 		mp_limb_t cr[pr],ci[pr],zr[pr],zi[pr*2],i2[pr*2],r2[pr*2];
-		_Bool zrs,zis,crs,cis=ys;
+		_Bool zrs,zis,crs,cis=_ys;
 		mpn_mul_1(cr,wh,pr,c);
-		mymp_add(cr,cr,xx,pr,0,xs,&crs);
+		mymp_add(cr,cr,xx,pr,0,_xs,&crs);
 		mpn_copyi(ci,yy,pr);
 		for(int j=0;j<512;j++){
 			zrs=crs;
@@ -39,7 +41,7 @@ void*drawman(void*x){
 			mpn_copyi(zr,cr,pr);
 			mpn_sqr(r2,zr,pr);
 			mpn_sqr(i2,zi,pr);
-			unsigned k=mx;
+			unsigned k=_m;
 			do{
 				mpn_mul_n(zi,zi,zr,pr);
 				mpn_lshift(zi+pr,zi+pr,pr,5);
@@ -99,7 +101,6 @@ int main(int argc,char**argv){
 					ny=ev.xbutton.y;
 				break;case Button4:case Button5:
 					mx+=ev.xbutton.button==Button4?25:mx>25?-25:0;
-					mxx=16777216/mx;
 				}
 			break;case ButtonRelease:
 				if(ev.xbutton.button==Button1){
